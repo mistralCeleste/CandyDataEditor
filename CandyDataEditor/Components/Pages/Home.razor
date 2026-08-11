@@ -47,8 +47,58 @@
 </div>
 
 @code {
-    private string gameItemHtml = "<p>The <strong>Aegis</strong> gives the [heroes] +50 armor.</p>";
-    private string gameItemMarkdown = string.Empty;
+    private string gameItemHtml = string.Empty;
+    private string gameItemMarkdown = @"# Setup
+~ [place] MAP-001
+~ [mob] FOE-003, [brute] FOE-004, [elite] FOE-005
+
+Enemies in the ==Whirlpool Abyss== have *defense* [defense] and reactions [warning] on their **hp-grids**.
+
+When an hp-grid has a [defense], place a foe marker over the grid. It takes two hits to wound the slot--the first hit removes the foe marker, the second to wound it.
+
+Reaction slots have [warning] on the hp-grid. Immediately after wounding a [warning] slot and before your damage pattern continues, resolve the [warning] reaction on the foe’s FAI card. If this takes the foe out of range, combat, or reduces your health to zero, your pattern stops; otherwise, you may continue to wound the foe afterwards.
+
+# Actions
+@ Wreckage
+Beastfolk **scavengers** prowl the wreck, prying apart broken timbers, their eyes gleaming with ruthless opportunity.
+
+@@ Scavengers
+Beastfolk scavengers swarm the wreckage strewn about the rockface. Clawed hands pry open shattered crates, eyes gleaming with treasure lust. Some growl disputes over spoils, while others sniff the winds for danger.
+
+@ Whirlpool
+Held aloft by reef spires in the center of the whirlpool is the shattered **Iserian ship**, its splintered hull being thrashed by whirlpool’s pull.
+
+@@ Iserian Ship
+The Moonlit Pearl, an Iserian ship, lies wrecked upon the jagged reef spires. Its ornate hull, once gleaming with silver runes, are now splintered. Torn sails drift like ghosts, battered by the whirlpool’s blustery breeze. [openbook] to EVT-004.
+
+# Triggers
+@ A
+From the bluff, the world seems to fall away beneath your feet. The wind whipping past as the roar of the Whirlpool Abyss rises to meet you. The path descends in a steep, switchbacking cut of stone and sand, each step revealing more of the churning blue waters below
+
+By the time you reach the beach, the air is thick with mist and the ground trembles with the slow, tidal pull of the great vortex waiting just offshore.
+
+@ B
+The beach below the bluff feels like the world’s forgotten dumping ground, a crescent of pale sand choked with shattered planks, torn sails, and the twisted ribs of long‑dead ships. At one end, a massive stone overhang juts out like a jagged jaw, casting a permanent shadow where the surf hisses and retreats.
+
+Beast‑folk scavengers pick through the wreckage by lifting crates, prying open barrels, and muttering to each other as they hunt for anything the Abyss hasn’t already claimed.
+
+@ C
+The Moonlit Pearl hangs helplessly between sea and sky, her hull wedged against the jagged black spires that thrust up from the churning Whirlpool Abyss. The great vortex twists below her, tugging at her keel with a hungry, spiraling pull, while her torn sails drift and snap like pale ghosts in the blustery wind.
+
+@ 503
+Two blocks and two symbols are shown in the room. Solve the puzzle to determine which symbol to cover with a block.
+
+[retrieve] PUZ-001A ([return] when solved)
+
+@ 504
+There is a star symbol, faintly glowing. Solve to unlock its secret.
+
+[retrieve] PUZ-003A ([return] when solved)
+
+@ 505
+Two barriers and two symbols. Solve the puzzle to determine which symbol to cover with a block.
+
+[retrieve] PUZ-002A ([return] when solved)";
     private List<string> activeDictionary = new();
     private string newCustomWord = string.Empty;
     private bool isDictionaryLoaded = false;
@@ -59,13 +109,8 @@
         if (firstRender && !isDictionaryLoaded)
         {
             isDictionaryLoaded = true;
-
-            // Load words on background thread so the UI renders immediately without freezing
             activeDictionary = await DictionaryService.SyncAndLoadAllDictionariesAsync();
-
             isLoadingDictionary = false;
-
-            // Trigger UI update to refresh dictionary count badge and push words to JS
             StateHasChanged();
         }
     }
@@ -91,11 +136,11 @@
 
     private void ResetContent()
     {
-        gameItemHtml = "<p>Default game item description...</p>";
+        gameItemMarkdown = "Default game item description...";
     }
 
     private void InsertSampleLore()
     {
-        gameItemHtml = "<h3>Excalibur</h3><p>Forged in ancient times, this blade inflicts <b>100 holy damage</b>.</p>";
+        gameItemMarkdown = "### Excalibur\nForged in ancient times, this [weapon] inflicts **100 holy damage** against ==undead==.";
     }
 }

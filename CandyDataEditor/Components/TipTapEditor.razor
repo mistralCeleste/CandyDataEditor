@@ -4,30 +4,71 @@
 @implements IAsyncDisposable
 
 <div class="tiptap-wrapper border rounded">
-    <!-- Top Editor Header & View Mode Toggle -->
-    <div class="d-flex justify-content-between align-items-center p-2 bg-light border-bottom">
-        <div class="btn-group btn-group-sm" role="group" aria-label="Editor View Mode">
-            <button type="button"
-                    class="btn @(currentViewMode == ViewMode.Formatted ? "btn-primary" : "btn-outline-secondary")"
-                    @onclick="() => SwitchViewMode(ViewMode.Formatted)">
-                📝 Formatted
-            </button>
-            <button type="button"
-                    class="btn @(currentViewMode == ViewMode.Markdown ? "btn-primary" : "btn-outline-secondary")"
-                    @onclick="() => SwitchViewMode(ViewMode.Markdown)">
-                🏷️ Markdown
-            </button>
-            <button type="button"
-                    class="btn @(currentViewMode == ViewMode.Html ? "btn-primary" : "btn-outline-secondary")"
-                    @onclick="() => SwitchViewMode(ViewMode.Html)">
-                🌐 HTML
-            </button>
+    <!-- Editor Toolbar -->
+    <div class="tiptap-toolbar bg-light border-bottom p-2 d-flex gap-1 align-items-center flex-wrap position-relative">
+
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("bold"))' title="Bold (Ctrl+B)">
+            <b>B</b>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("italic"))' title="Italic (Ctrl+I)">
+            <i>I</i>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("keyword"))' title="Keyword (Ctrl+K)">
+            <u><b>K</b></u>
+        </button>
+
+        <div class="vr mx-1"></div>
+
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("actionParent"))' title="Parent Action (@@)">
+            @@
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("actionChild"))' title="Child Action (@@@@)">
+            @@@@
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary game-icon-ligature" @onclick='() => ExecCommand("toggleList")' title="Toggle List (~)">
+            [arrowhead]
+        </button>
+
+        <div class="vr mx-1"></div>
+
+        <!-- Searchable Icon Picker Button -->
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OpenIconModal">
+            🔍 Icons (@AllIcons.Count)
+        </button>
+
+        <div class="ms-auto d-flex gap-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("undo"))'>↶</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("redo"))'>↷</button>
+
+            <div class="vr mx-1"></div>
+
+            <div class="d-flex justify-content-between align-items-center bg-light">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Editor View Mode">
+                    <button type="button"
+                            class="btn btn-sm  @(currentViewMode == ViewMode.Formatted ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SwitchViewMode(ViewMode.Formatted)">
+                        📝
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm  @(currentViewMode == ViewMode.Markdown ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SwitchViewMode(ViewMode.Markdown)">
+                        🏷️
+                    </button>
+                    <button type="button"
+                            class="btn  @(currentViewMode == ViewMode.Html ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SwitchViewMode(ViewMode.Html)">
+                        🌐
+                    </button>
+                </div>
+
+                <small class="text-muted">
+                    &nbsp; Mode: <strong>@currentViewMode.ToString()</strong>
+                </small>
+            </div>
         </div>
 
-        <small class="text-muted">
-            Mode: <strong>@currentViewMode.ToString()</strong>
-        </small>
     </div>
+   
 
     <!-- 1. FORMATTED VIEW (TipTap ProseMirror Canvas) -->
     <div class="@(currentViewMode == ViewMode.Formatted ? "d-block" : "d-none")">
@@ -57,42 +98,6 @@
                       @oninput="OnHtmlRawInput"></textarea>
         </div>
     }
-
-    <!-- Editor Toolbar -->
-    <div class="tiptap-toolbar bg-light border-bottom p-2 d-flex gap-1 align-items-center flex-wrap position-relative">
-        
-        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("bold"))' title="Bold (Ctrl+B)">
-            <b>B</b>
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("italic"))' title="Italic (Ctrl+I)">
-            <i>I</i>
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-danger" @onclick='(() => ExecCommand("keyword"))' title="Keyword (Ctrl+K)">
-            <u><b>Keyword</b></u>
-        </button>
-
-        <div class="vr mx-1"></div>
-
-        <button type="button" class="btn btn-sm btn-dark" @onclick='(() => ExecCommand("actionParent"))' title="Parent Action (@@)">
-            @@ Parent Action
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-dark" @onclick='(() => ExecCommand("actionChild"))' title="Child Action (@@@@)">
-            @@@@ Child Action
-        </button>
-
-        <div class="vr mx-1"></div>
-
-        <!-- Searchable Icon Picker Button -->
-        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OpenIconModal">
-            🔍 Insert Icon (@AllIcons.Count)
-        </button>
-
-        <div class="ms-auto d-flex gap-1">
-            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("undo"))'>↶</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("redo"))'>↷</button>
-        </div>
-
-    </div>
 
     <!-- TipTap Editor Window -->
     <div id="@EditorId" class="tiptap-container p-3" spellcheck="false"></div>
@@ -324,20 +329,10 @@
             _dotnetRef = DotNetObjectReference.Create(this);
             _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/tiptap-interop.js");
 
-            await JSRuntime.InvokeVoidAsync("initTipTap", EditorId, Value, _dotnetRef);
+            // Pass MarkdownValue as the initial content string!
+            await JSRuntime.InvokeVoidAsync("initTipTap", EditorId, MarkdownValue, _dotnetRef);
 
             _isInitialized = true;
-
-            // Immediately populate initial MarkdownValue if it was empty!
-            if (string.IsNullOrWhiteSpace(MarkdownValue) && _jsModule is not null)
-            {
-                var initialMarkdown = await JSRuntime.InvokeAsync<string>("getTipTapMarkdown", EditorId);
-                if (!string.IsNullOrWhiteSpace(initialMarkdown))
-                {
-                    MarkdownValue = initialMarkdown;
-                    await MarkdownValueChanged.InvokeAsync(initialMarkdown);
-                }
-            }
 
             if (GameDictionaryWords != null && GameDictionaryWords.Any())
             {

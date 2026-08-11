@@ -1,4 +1,4 @@
-﻿import { Editor, Node, Mark, Extension, mergeAttributes, markInputRule, markPasteRule, textblockTypeInputRule } from '@tiptap/core';
+﻿import { Editor, Node, Mark, Extension, mergeAttributes, markInputRule, markPasteRule, textblockTypeInputRule, wrappingInputRule } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { Slice, Fragment } from '@tiptap/pm/model';
@@ -175,7 +175,7 @@ export const KeywordMark = Mark.create({
     addPasteRules() {
         return [
             markPasteRule({
-                find: /(?:^|\s)(==(?!\s+==)((?:[^=]+))==(?!\s+==))/g,
+                find: /(?:==)([^=]+)(?:==)/g,
                 type: this.type,
             }),
         ];
@@ -208,7 +208,6 @@ export const ActionHeading = Node.create({
         return ['div', mergeAttributes(HTMLAttributes, { class: className }), 0];
     },
 
-    // Commands callable from JavaScript / Blazor Toolbar
     addCommands() {
         return {
             setActionHeading: (attributes) => ({ commands }) => {
@@ -222,11 +221,13 @@ export const ActionHeading = Node.create({
 
     addInputRules() {
         return [
+            // Matches "@@ " at start of line for Sub-Action
             textblockTypeInputRule({
                 find: /^@@\s$/,
                 type: this.type,
                 getAttributes: () => ({ level: 2 }),
             }),
+            // Matches "@ " at start of line for Main Action
             textblockTypeInputRule({
                 find: /^@\s$/,
                 type: this.type,
@@ -235,34 +236,60 @@ export const ActionHeading = Node.create({
         ];
     },
 
-    // Prosemirror Paste Plugin to catch pasted @ and @@ block lines
     addProseMirrorPlugins() {
         return [
             new Plugin({
                 key: new PluginKey('actionHeadingPaste'),
                 props: {
-                    transformPasted(slice) {
-                        // Transforms pasted text lines starting with @ or @@ into ActionHeading nodes
+                    transformPasted(slice, view) {
+                        const schema = view.state.schema;
+                        if (!schema.nodes.actionHeading) return slice;
+
                         const newContent = [];
 
-                        slice.content.forEach(node => {
+                        slice.content.forEach((node) => {
                             if (node.isTextblock) {
                                 const text = node.textContent;
+
+                                let level = 0;
+                                let prefixLength = 0;
+
                                 if (text.startsWith('@@ ')) {
-                                    const textWithoutPrefix = text.slice(3);
-                                    newContent.push(
-                                        node.type.schema.nodes.actionHeading.create(
-                                            { level: 2 },
-                                            node.type.schema.text(textWithoutPrefix)
-                                        )
-                                    );
-                                    return;
+                                    level = 2;
+                                    prefixLength = 3;
                                 } else if (text.startsWith('@ ')) {
-                                    const textWithoutPrefix = text.slice(2);
+                                    level = 1;
+                                    prefixLength = 2;
+                                }
+
+                                if (level > 0) {
+                                    // Preserve existing child nodes/marks while stripping prefix characters
+                                    let contentFragment = Fragment.empty;
+
+                                    if (node.content && node.content.size > 0) {
+                                        // Cut prefix characters off the first child text node
+                                        const children = [];
+                                        let charsToCut = prefixLength;
+
+                                        node.content.forEach((child) => {
+                                            if (charsToCut > 0 && child.isText) {
+                                                const newText = child.text.slice(charsToCut);
+                                                charsToCut = 0;
+                                                if (newText.length > 0) {
+                                                    children.push(child.withText(newText));
+                                                }
+                                            } else {
+                                                children.push(child);
+                                            }
+                                        });
+
+                                        contentFragment = Fragment.from(children);
+                                    }
+
                                     newContent.push(
-                                        node.type.schema.nodes.actionHeading.create(
-                                            { level: 1 },
-                                            node.type.schema.text(textWithoutPrefix)
+                                        schema.nodes.actionHeading.create(
+                                            { level: level },
+                                            contentFragment
                                         )
                                     );
                                     return;
@@ -277,7 +304,20 @@ export const ActionHeading = Node.create({
             }),
         ];
     },
+});
 
+export const TildeList = Extension.create({
+    name: 'tildeList',
+
+    addInputRules() {
+        return [
+            // Triggers when typing "~ " at the start of a line
+            wrappingInputRule({
+                find: /^~\s$/,
+                type: this.editor.schema.nodes.bulletList,
+            }),
+        ];
+    },
 });
 
 export const GameDictionary = Extension.create({
@@ -345,6 +385,10 @@ window.execTipTapCommand = function (elementId, commandName, value) {
     if (!editor) return;
 
     switch (commandName) {
+        case 'toggleList':
+            // Toggles the highlighted selection into a bullet list
+            editor.chain().focus().toggleBulletList().run();
+            break;
         case 'keyword':
             // Toggle mark specifically on inline selection
             editor.chain().focus().toggleMark('keyword').run();
@@ -415,5 +459,6 @@ window.TipTap = {
     GameIconDecoration,
     KeywordMark,
     ActionHeading,
+    TildeList,
     NativeCustomSpellchecker
 };

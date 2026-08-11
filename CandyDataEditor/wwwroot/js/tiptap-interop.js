@@ -6,6 +6,10 @@ window.execTipTapCommand = function (elementId, commandName, value) {
     if (!editor) return;
 
     switch (commandName) {
+        case 'toggleList':
+            // Toggles the highlighted selection into a bullet list
+            editor.chain().focus().toggleBulletList().run();
+            break;
         case 'keyword':
             // Toggle mark specifically on inline selection
             editor.chain().focus().toggleMark('keyword').run();
@@ -31,8 +35,6 @@ window.execTipTapCommand = function (elementId, commandName, value) {
         case 'insertIcon':
             if (!value) return;
 
-            // If the value is already an arrow or dash (e.g. "->" or "--"), insert directly.
-            // Otherwise, wrap named tags in brackets (e.g. "heroes" -> "[heroes]")
             const textToInsert = (value === '->' || value === '<-' || value === '--' || value.startsWith('['))
                 ? value
                 : `[${value}]`;
@@ -48,54 +50,51 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper) {
     const container = document.getElementById(elementId);
     if (!container) return;
 
-    // Attach Right-Click Context Menu Listener for Misspelled Words
-    container.addEventListener('contextmenu', (event) => {
-        const target = event.target.closest('.custom-misspelled-word');
-        if (target) {
+    // Direct Clipboard Intercept for Pasted Markdown / Headings / Lists
+    container.addEventListener('paste', (event) => {
+        const clipboardData = event.clipboardData || window.clipboardData;
+        if (!clipboardData) return;
+
+        const pastedText = clipboardData.getData('text/plain');
+
+        // Check if pasted content contains markdown markers (#, ##, ~, -, *)
+        if (pastedText && /^(#+|\~|-|\*|\d+\.)\s/m.test(pastedText)) {
             event.preventDefault();
             event.stopPropagation();
 
-            const word = target.innerText.trim();
-            const rect = container.getBoundingClientRect();
-
-            // Calculate relative offset inside wrapper
-            const clickX = event.clientX - rect.left;
-            const clickY = event.clientY - rect.top;
-
             const editor = window.tiptapInstances[elementId];
-            if (editor && editor.view) {
-                // Find exact DOM position of the misspelled span inside ProseMirror
-                const pos = editor.view.posAtDOM(target, 0);
-
-                if (pos !== null && pos !== undefined) {
-                    const from = pos;
-                    const to = pos + word.length;
-
-                    dotnetHelper.invokeMethodAsync('OpenSpellcheckContextMenu',
-                        word, from, to, clickX, clickY);
-                }
+            if (editor) {
+                const parsedHtml = parseCustomMarkdownToHtml(pastedText);
+                // Insert parsed HTML structure directly into active ProseMirror cursor position
+                editor.commands.insertContent(parsedHtml);
             }
         }
+    }, true); // Capture phase listener
+
+    // Attach Right-Click Context Menu Listener ...
+    container.addEventListener('contextmenu', (event) => {
+        // ... (keep your existing contextmenu code here) ...
     });
 
-    // Close context menu when clicking anywhere outside
+    // Close context menu on outside click ...
     window.addEventListener('click', (event) => {
-        // If the click is outside any open spellcheck menu, tell Blazor to close it
-        if (!event.target.closest('.spellcheck-context-menu')) {
-            dotnetHelper.invokeMethodAsync('CloseSpellcheckContextMenu');
-        }
+        // ... (keep your existing click code here) ...
     });
 
     const editor = new window.TipTap.Editor({
         element: container,
         content: parseCustomMarkdownToHtml(initialContent),
         extensions: [
-            window.TipTap.StarterKit,
+            window.TipTap.StarterKit.configure({
+                heading: { levels: [1, 2, 3] },
+            }),
             window.TipTap.Markdown,
             window.TipTap.KeywordMark,
             window.TipTap.ActionHeading,
             window.TipTap.GameIconDecoration,
             window.TipTap.NativeCustomSpellchecker,
+            window.TipTap.MultiColumn,
+            window.TipTap.TildeList,
         ],
         onUpdate: ({ editor }) => {
             const html = editor.getHTML();
@@ -104,9 +103,6 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper) {
         },
     });
 
-    if (!window.tiptapInstances) {
-        window.tiptapInstances = {};
-    }
     window.tiptapInstances[elementId] = editor;
 };
 
@@ -114,54 +110,39 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper) {
 function matchCase(original, replacement) {
     if (!original || !replacement) return replacement;
 
-    // ALL UPPERCASE (e.g. "PENINSULLA" -> "PENINSULA")
     if (original === original.toUpperCase() && original.length > 1) {
         return replacement.toUpperCase();
     }
 
-    // Title / Capitalized First Letter (e.g. "Peninsulla" -> "Peninsula")
     const firstChar = original.charAt(0);
     if (firstChar === firstChar.toUpperCase() && firstChar !== firstChar.toLowerCase()) {
         return replacement.charAt(0).toUpperCase() + replacement.slice(1);
     }
 
-    // Default lowercase (e.g. "peninsulla" -> "peninsula")
     return replacement.toLowerCase();
 }
 
-// JS Helper to accurately replace the word range in TipTap
+// Single consolidated JS Helper to accurately replace word range
 window.replaceTipTapRange = function (elementId, from, to, originalWord, newText) {
     const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
     if (!editor) return;
 
-    // Match original casing (e.g., Peninsulla -> Peninsula)
-    const casedText = matchCase(originalWord, newText);
+    // Use originalWord for casing if provided, otherwise fallback to direct text
+    const textToInsert = originalWord ? matchCase(originalWord, newText) : newText;
 
-    // Execute replacement transaction over exact range
     editor.chain()
         .focus()
         .deleteRange({ from, to })
-        .insertContentAt(from, casedText)
+        .insertContentAt(from, textToInsert)
         .run();
 };
 
-// JS Helper to replace word on suggestion click
-window.replaceTipTapRange = function (elementId, from, to, newText) {
-    const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
-    if (!editor) return;
-
-    editor.chain().focus().insertContentAt({ from, to }, newText).run();
-};
-
-// 1. Maintain global Set for O(1) checks
 window.activeGameWords = new Set();
-// Maintain array for fast suggestion searches
 window.activeGameWordsArray = [];
 
 window.updateGameDictionary = function (elementId, customWordList) {
     if (!customWordList) return;
 
-    // Fast batch load into Set
     const cleanList = customWordList.map(w => w.toLowerCase().trim());
     window.activeGameWords = new Set(cleanList);
     window.activeGameWordsArray = cleanList;
@@ -169,12 +150,10 @@ window.updateGameDictionary = function (elementId, customWordList) {
     const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
     if (!editor || !editor.view) return;
 
-    // Trigger ProseMirror decoration refresh
     const { state, dispatch } = editor.view;
     dispatch(state.tr.setMeta('dictionaryUpdated', Date.now()));
 };
 
-// 2. ULTRA-FAST JS Levenshtein Suggestion Engine (Runs in 2ms)
 window.getSpellSuggestions = function (misspelledWord, maxSuggestions = 5) {
     if (!misspelledWord || window.activeGameWordsArray.length === 0) return [];
 
@@ -183,13 +162,11 @@ window.getSpellSuggestions = function (misspelledWord, maxSuggestions = 5) {
     const firstChar = target[0];
     const targetLen = target.length;
 
-    // Filter candidates by length and first character
     const candidates = window.activeGameWordsArray.filter(w => {
         if (Math.abs(w.length - targetLen) > 3) return false;
         return w[0] === firstChar || fastLevenshtein(target, w) <= 2;
     });
 
-    // Score candidates by Levenshtein distance
     const scored = candidates.map(w => ({
         word: w,
         dist: fastLevenshtein(target, w)
@@ -197,14 +174,12 @@ window.getSpellSuggestions = function (misspelledWord, maxSuggestions = 5) {
 
     scored.sort((a, b) => a.dist - b.dist || Math.abs(a.word.length - targetLen) - Math.abs(b.word.length - targetLen));
 
-    // Return top unique suggestions WITH MATCHED CASE
     const results = [];
     const seen = new Set();
 
     for (const item of scored) {
         if (item.dist > 3) break;
 
-        // Apply case matching to suggestion string
         const casedWord = matchCase(rawTarget, item.word);
 
         if (!seen.has(casedWord.toLowerCase())) {
@@ -217,7 +192,6 @@ window.getSpellSuggestions = function (misspelledWord, maxSuggestions = 5) {
     return results;
 };
 
-// Fast Levenshtein implementation in pure JS
 function fastLevenshtein(a, b) {
     if (a === b) return 0;
     if (a.length === 0) return b.length;
@@ -244,49 +218,81 @@ function fastLevenshtein(a, b) {
     return matrix[b.length][a.length];
 }
 
-// 1. Converts Raw Markdown (from SQLite) -> HTML elements for TipTap on initial load
-function parseCustomMarkdownToHtml(md) {
-    if (!md) return '';
+// wwwroot/js/tiptap-interop.js
 
-    let html = md;
+function parseCustomMarkdownToHtml(markdown) {
+    if (!markdown || !markdown.trim()) return '<p></p>';
 
-    // Convert ==keyword== to <span class="keyword-mark">keyword</span>
-    html = html.replace(/==([^=]+)==/g, '<span class="keyword-mark">$1</span>');
+    let src = markdown.replace(/\r\n/g, '\n').trim();
 
-    // Convert lines starting with @@ to child action node
-    html = html.replace(/^@@\s+(.*$)/gim, '<div class="action-menu-child">$1</div>');
+    // 1. Process Inline Marks FIRST (Bold, Italic, Keyword)
+    // ==keyword== -> <span class="keyword-mark">keyword</span>
+    src = src.replace(/==([^=]+)==/g, '<span class="keyword-mark">$1</span>');
+    // **bold** -> <strong>bold</strong>
+    src = src.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // *italic* -> <em>italic</em>
+    src = src.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-    // Convert lines starting with @ to parent action node
-    html = html.replace(/^@\s+(.*$)/gim, '<div class="action-menu-parent">$1</div>');
+    // GUARD: If content was originally HTML, return immediately after inline mark replacement
+    if (/^<[a-z][\s\S]*>/i.test(src)) {
+        return src;
+    }
 
-    return html;
+    // 2. Headings (#, ##, ###)
+    src = src.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    src = src.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    src = src.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+    // 3. Action Headings (@ and @@)
+    src = src.replace(/^@@ (.*$)/gim, '<div class="action-menu-child">$1</div>');
+    src = src.replace(/^@ (.*$)/gim, '<div class="action-menu-parent">$1</div>');
+
+    // 4. Lists (~, -, *)
+    src = src.replace(/^(~|-|\*)\s+(.*$)/gim, '<li><p>$2</p></li>');
+
+    // Group consecutive list items into <ul>
+    src = src.replace(/(<li><p>.*?<\/p><\/li>\n?)+/gs, '<ul>$&</ul>');
+
+    const lines = src.split('\n');
+    let result = [];
+
+    for (let line of lines) {
+        let trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (/^<h[1-6]|^<div|^<ul|^<li|^<\/ul>|^<\/li>/.test(trimmed)) {
+            result.push(trimmed);
+        } else {
+            result.push(`<p>${trimmed}</p>`);
+        }
+    }
+
+    return result.join('');
 }
 
-// 2. Converts TipTap Editor State -> Clean Raw Game Markdown
+// Converts TipTap Editor State -> Clean Raw Game Markdown
 function serializeDocumentToCustomMarkdown(editor) {
     if (!editor.storage || !editor.storage.markdown) return '';
 
-    // Get base markdown export from tiptap-markdown
     let markdown = editor.storage.markdown.getMarkdown();
 
-    // 1. Convert Level 1 Action Divs (with any attributes) to "@ ActionText"
-    // Matches: <div level="1" class="action-menu-parent">Text</div> or similar
+    // 1. Convert Level 1 Action Divs
     markdown = markdown.replace(/<div[^>]*class="action-menu-parent"[^>]*>([\s\S]*?)<\/div>/gi, (match, p1) => {
         const cleanText = p1.replace(/<p>/gi, '').replace(/<\/p>/gi, '').trim();
         return `@ ${cleanText}`;
     });
 
-    // 2. Convert Level 2 Action Divs (with any attributes) to "@@ ActionText"
+    // 2. Convert Level 2 Action Divs
     markdown = markdown.replace(/<div[^>]*class="action-menu-child"[^>]*>([\s\S]*?)<\/div>/gi, (match, p1) => {
         const cleanText = p1.replace(/<p>/gi, '').replace(/<\/p>/gi, '').trim();
         return `@@ ${cleanText}`;
     });
 
-    // 3. Convert <span class="keyword-mark">word</span> back to ==word==
+    // 3. Convert <span class="keyword-mark">
     markdown = markdown.replace(/<span[^>]*class="keyword-mark"[^>]*>([\s\S]*?)<\/span>/gi, '==$1==');
 
     // 4. Unescape ligature brackets: \[mob\] -> [mob]
-    markdown = markdown.replace(/\\\[([a-zA-Z0-9]+)\\\]/g, '[$1]');
+    markdown = markdown.replace(/\\\[([a-zA-Z0-9_-]+)\\\]/g, '[$1]');
 
     return markdown.trim();
 }
@@ -296,9 +302,8 @@ window.getTipTapSelectedText = function (elementId) {
     if (!editor) return '';
 
     const { from, to } = editor.state.selection;
-    if (from === to) return ''; // No selection
+    if (from === to) return '';
 
-    // Get plain text inside selection and strip surrounding brackets or spaces if present
     let selectedText = editor.state.doc.textBetween(from, to, ' ');
     return selectedText.replace(/^\[|\]$/g, '').trim();
 };
@@ -310,7 +315,6 @@ window.getTipTapMarkdown = function (elementId) {
     return serializeDocumentToCustomMarkdown(editor);
 };
 
-// Gets the current HTML directly from TipTap instance
 window.getTipTapHtml = function (elementId) {
     const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
     if (!editor) return '';
@@ -322,16 +326,10 @@ window.setTipTapContentFromMarkdown = function (elementId, markdownText) {
     const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
     if (!editor) return;
 
-    // Use TipTap's internal markdown extension command if available, or set content with markdown emit
-    if (editor.commands.setContent) {
-        // Passing emitUpdate = false prevents firing onUpdate back to Blazor
-        editor.commands.setContent(markdownText || '', false, {
-            parseOptions: { preserveWhitespace: 'full' }
-        });
-    }
+    const parsedHtml = parseCustomMarkdownToHtml(markdownText);
+    editor.commands.setContent(parsedHtml, false);
 };
 
-// Sets TipTap content when user edits raw HTML text
 window.setTipTapContentFromHtml = function (elementId, htmlText) {
     const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
     if (!editor) return;
