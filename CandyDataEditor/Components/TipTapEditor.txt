@@ -1,0 +1,244 @@
+﻿@using Microsoft.JSInterop
+@using CandyDataEditor.Services
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<!-- TipTapEditor.razor -->
+<div class="tiptap-wrapper border rounded position-relative">
+    
+    <!-- Top Editor Header & View Mode Toggle -->
+    <div class="d-flex justify-content-between align-items-center p-2 bg-light border-bottom">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Editor View Mode">
+            <button type="button" 
+                    class="btn @(currentViewMode == ViewMode.Formatted ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SwitchViewMode(ViewMode.Formatted)">
+                📝 Formatted
+            </button>
+            <button type="button" 
+                    class="btn @(currentViewMode == ViewMode.Markdown ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SwitchViewMode(ViewMode.Markdown)">
+                🏷️ Markdown
+            </button>
+            <button type="button" 
+                    class="btn @(currentViewMode == ViewMode.Html ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SwitchViewMode(ViewMode.Html)">
+                🌐 HTML
+            </button>
+        </div>
+
+        <small class="text-muted">
+            Mode: <strong>@currentViewMode.ToString()</strong>
+        </small>
+    </div>
+
+    <!-- 1. FORMATTED VIEW (TipTap ProseMirror Canvas) -->
+    <div class="@(currentViewMode == ViewMode.Formatted ? "d-block" : "d-none")">
+        <div id="@EditorId" class="tiptap-container p-3" spellcheck="false" @oncontextmenu:preventDefault></div>
+    </div>
+
+    <!-- 2. MARKDOWN VIEW (Editable Raw Markdown Area) -->
+    @if (currentViewMode == ViewMode.Markdown)
+    {
+        <div class="p-2">
+            <textarea class="form-control font-monospace text-monospace" 
+                      rows="12" 
+                      style="font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9rem;"
+                      value="@MarkdownValue" 
+                      @oninput="OnMarkdownRawInput"></textarea>
+        </div>
+    }
+
+    <!-- 3. HTML VIEW (Editable Raw HTML Area) -->
+    @if (currentViewMode == ViewMode.Html)
+    {
+        <div class="p-2">
+            <textarea class="form-control font-monospace text-monospace" 
+                      rows="12" 
+                      style="font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9rem;"
+                      value="@Value" 
+                      @oninput="OnHtmlRawInput"></textarea>
+        </div>
+    }
+
+    <!-- Right-Click Spellcheck Context Menu -->
+    @if (isContextMenuVisible && currentViewMode == ViewMode.Formatted)
+    {
+        <div class="dropdown-menu show shadow-lg position-absolute z-3 spellcheck-context-menu" 
+             style="top: @(contextMenuY)px; left: @(contextMenuX)px; min-width: 180px;">
+            <h6 class="dropdown-header text-danger">Misspelled: "@selectedMisspelledWord"</h6>
+            
+            @if (suggestions.Any())
+            {
+                <div class="dropdown-divider"></div>
+                <small class="dropdown-header text-muted">Suggestions:</small>
+                @foreach (var suggestion in suggestions)
+                {
+                    <button type="button" class="dropdown-item fw-bold text-primary" 
+                            @onclick="() => ReplaceWord(suggestion)">
+                        💡 @suggestion
+                    </button>
+                }
+            }
+
+            <div class="dropdown-divider"></div>
+            <button type="button" class="dropdown-item text-success" @onclick="AddSelectedWordToDictionary">
+                ➕ Add "@selectedMisspelledWord" to Dictionary
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    public enum ViewMode
+    {
+        Formatted,
+        Markdown,
+        Html
+    }
+
+    private ViewMode currentViewMode = ViewMode.Formatted;
+
+    [Parameter] public string Value { get; set; } = string.Empty; // HTML
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter] public string MarkdownValue { get; set; } = string.Empty; // Markdown
+    [Parameter] public EventCallback<string> MarkdownValueChanged { get; set; }
+
+    [Parameter] public List<string> GameDictionaryWords { get; set; } = new();
+    [Parameter] public EventCallback<string> OnAddWordRequested { get; set; }
+
+    private string EditorId = $"tiptap-{Guid.NewGuid():N}";
+    private DotNetObjectReference<TipTapEditor>? _dotnetRef;
+    private IJSObjectReference? _jsModule;
+    private bool _isInitialized = false;
+    private List<string>? _lastSyncedDictionary = null;
+
+    // View Switching logic
+    private async Task SwitchViewMode(ViewMode newMode)
+    {
+        if (currentViewMode == newMode) return;
+
+        currentViewMode = newMode;
+
+        // Hide right-click spellcheck menu when leaving Formatted mode
+        isContextMenuVisible = false;
+
+        // If returning back to Formatted View, update TipTap instance content with the latest edits
+        if (newMode == ViewMode.Formatted && _isInitialized)
+        {
+            await JSRuntime.InvokeVoidAsync("setTipTapContentFromMarkdown", EditorId, MarkdownValue);
+        }
+    }
+
+    // Direct Markdown Textarea Edits
+    private async Task OnMarkdownRawInput(ChangeEventArgs e)
+    {
+        string updatedMarkdown = e.Value?.ToString() ?? string.Empty;
+        MarkdownValue = updatedMarkdown;
+        await MarkdownValueChanged.InvokeAsync(updatedMarkdown);
+
+        // Keep TipTap document synchronized in background
+        if (_isInitialized)
+        {
+            await JSRuntime.InvokeVoidAsync("setTipTapContentFromMarkdown", EditorId, updatedMarkdown);
+        }
+    }
+
+    // Direct HTML Textarea Edits
+    private async Task OnHtmlRawInput(ChangeEventArgs e)
+    {
+        string updatedHtml = e.Value?.ToString() ?? string.Empty;
+        Value = updatedHtml;
+        await ValueChanged.InvokeAsync(updatedHtml);
+
+        if (_isInitialized)
+        {
+            await JSRuntime.InvokeVoidAsync("setTipTapContentFromHtml", EditorId, updatedHtml);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnContentChanged(string html, string markdown)
+    {
+        Value = html;
+        await ValueChanged.InvokeAsync(html);
+
+        MarkdownValue = markdown;
+        await MarkdownValueChanged.InvokeAsync(markdown);
+    }
+
+    // ... Keep existing OnAfterRenderAsync, OnParametersSetAsync, Context Menu methods intact ...
+}
+    [JSInvokable]
+    public async Task OnContentChanged(string newHtml, string newMarkdown)
+    {
+        if (Value != newHtml)
+        {
+            Value = newHtml;
+            await ValueChanged.InvokeAsync(Value);
+        }
+
+        if (MarkdownValue != newMarkdown)
+        {
+            MarkdownValue = newMarkdown;
+            await MarkdownValueChanged.InvokeAsync(MarkdownValue);
+        }
+    }
+
+    private List<string> FilteredIcons => string.IsNullOrWhiteSpace(searchTerm)
+        ? AllIcons
+        : AllIcons.Where(i => i.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    // Parsed list of all ligatures from your FontForge pipeline demo
+    private static readonly List<string> AllIcons = new()
+    {
+        "action", "actor", "aegis", "allfoes", "anvil", "any", "aquarius", "aries", "armor", "arrowhead",
+        "banish", "book", "booklet", "boss", "brute", "burn", "buycard", "cancer", "capricorn", 
+        "card10clubs", "card10diamonds", "card10hearts", "card10spades",
+        "card2clubs", "card2diamonds", "card2hearts", "card2spades",
+        "card3clubs", "card3diamonds", "card3hearts", "card3spades",
+        "card4clubs", "card4diamonds", "card4hearts", "card4spades",
+        "card5clubs", "card5diamonds", "card5hearts", "card5spades",
+        "card6clubs", "card6diamonds", "card6hearts", "card6spades",
+        "card7clubs", "card7diamonds", "card7hearts", "card7spades",
+        "card8clubs", "card8diamonds", "card8hearts", "card8spades",
+        "card9clubs", "card9diamonds", "card9hearts", "card9spades",
+        "cardaceclubs", "cardacediamonds", "cardacehearts", "cardacespades",
+        "cardjackclubs", "cardjackdiamonds", "cardjackhearts", "cardjackspades", "cardjoker",
+        "cardkingclubs", "cardkingdiamonds", "cardkinghearts", "cardkingspades",
+        "cardqueenclubs", "cardqueendiamonds", "cardqueenhearts", "cardqueenspades",
+        "cardboardboxclosed", "cardboardbox", "coin", "combat", "concat", "critical", "cycle",
+        "d10", "d12", "d201", "d2020", "d4", "d61", "d62", "d63", "d64", "d65", "d66", "d8",
+        "damagenull", "damagex", "damage", "day", "defense", "dicefire", "diceshield", "dicetarget", "dice", "diff",
+        "directionaldamagenull", "directionaldamagex", "directionaldamage", "discard", "draw", "eatery", "elite",
+        "ethereal", "event", "exchange", "flying", "foe", "foes", "fudgeblank", "fudgeminus", "fudgeplus", "gain",
+        "gemini", "goto", "health", "hero", "heroes", "idcard", "interruption", "item", "keycard", "key", "leo",
+        "libra", "location", "lock", "lose", "marker", "melee", "might", "minus", "mob", "moondial", "move", "nextchoice",
+        "no", "npc", "null", "onehanded", "openbook", "overlord", "passive", "pathfinder", "pickup", "pisces", "place",
+        "play", "plus", "pull", "push", "quest", "random", "range", "ranged", "reaction", "refreshmarker", "refresh",
+        "remove", "repeat2", "repeat3", "repeatcritical", "repeatdice", "repeatfoe", "repeatmarker",
+        "repeatmight", "repeatthreat", "repeatvalor", "repeatwarning", "repeatweapon", "repeatwisdom", "repeat",
+        "reroll", "retrieve", "return", "room", "sage", "sagittarius", "scorpio", "search", "sellcard", "slota",
+        "slotaegislocked", "slotaegis", "slotany", "slotb", "slotblank", "slotc", "slotd", "slote",
+        "slotlocked", "slotmarkerlocked", "slotmarker", "slotmightlocked", "slotmight", "slotminus",
+        "slotplus", "slotrefresh", "slotthreat", "slotvalorlocked", "slotvalor", "slotwisdomlocked",
+        "slotwisdom", "slotx", "snap", "special", "stack", "sundial", "swap", "tableau", "target", "taurus",
+        "threat", "tierbronze", "tiergold", "tierplatinum", "tiersilver", "tierstarter", "trade", "trophy",
+        "twohanded", "valor", "vanguard", "virgo", "warblade", "warning", "weapon", "wheel", "wing", "wisdom", "x", "yes"
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("destroyTipTap", EditorId);
+            if (_jsModule is not null)
+            {
+                await _jsModule.DisposeAsync();
+            }
+        }
+        catch { /* ignore */ }
+
+        _dotnetRef?.Dispose();
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@tiptap/core": "^3.29.2",
+    "@tiptap/extension-character-count": "^3.29.2",
+    "@tiptap/extension-placeholder": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2"
+  }
+}

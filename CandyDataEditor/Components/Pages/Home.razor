@@ -1,0 +1,101 @@
+﻿@page "/"
+@using CandyDataEditor.Components
+@using CandyDataEditor.Services
+@inject GameDictionaryService DictionaryService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Game Data Editor</PageTitle>
+
+<div class="container my-4">
+    <h2>Game Data Editor</h2>
+    <p class="text-muted">Editing Item Description with TipTap v3 & Markdown</p>
+
+    <div class="card mb-3 bg-light">
+        <div class="card-body d-flex gap-2 align-items-center">
+            <span class="fw-bold">Add Custom Term:</span>
+            <input type="text" class="form-control form-control-sm w-25"
+                   placeholder="e.g. mithril, warblade..."
+                   @bind="newCustomWord" />
+            <button class="btn btn-sm btn-success" @onclick="AddNewWordToDictionary">
+                ➕ Add to Game Dictionary
+            </button>
+            <span class="text-muted ms-auto">
+                <small>(@activeDictionary.Count terms)</small>
+            </span>
+        </div>
+    </div>
+
+    <!-- 1. TipTap Editor Form Field -->
+    <div class="card mb-4">
+        <div class="card-header font-weight-bold d-flex justify-content-between align-items-center">
+            <span>Item Description</span>
+            <small class="text-muted">Loaded Words: @activeDictionary.Count</small>
+        </div>
+        <div class="card-body">
+            <TipTapEditor @bind-Value="gameItemHtml"
+                          @bind-MarkdownValue="gameItemMarkdown"
+                          GameDictionaryWords="activeDictionary"
+                          OnAddWordRequested="AddWordFromContextMenu" />
+        </div>
+    </div>
+
+    <!-- 2. Controls & Actions -->
+    <div class="d-flex gap-2 mb-4">
+        <button class="btn btn-secondary" @onclick="ResetContent">Reset Text</button>
+        <button class="btn btn-outline-primary" @onclick="InsertSampleLore">Insert Game Lore</button>
+    </div>
+</div>
+
+@code {
+    private string gameItemHtml = "<p>The <strong>Aegis</strong> gives the [heroes] +50 armor.</p>";
+    private string gameItemMarkdown = string.Empty;
+    private List<string> activeDictionary = new();
+    private string newCustomWord = string.Empty;
+    private bool isDictionaryLoaded = false;
+    private bool isLoadingDictionary = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !isDictionaryLoaded)
+        {
+            isDictionaryLoaded = true;
+
+            // Load words on background thread so the UI renders immediately without freezing
+            activeDictionary = await DictionaryService.SyncAndLoadAllDictionariesAsync();
+
+            isLoadingDictionary = false;
+
+            // Trigger UI update to refresh dictionary count badge and push words to JS
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddNewWordToDictionary()
+    {
+        if (string.IsNullOrWhiteSpace(newCustomWord)) return;
+
+        await AddWordFromContextMenu(newCustomWord.Trim());
+        newCustomWord = string.Empty;
+    }
+
+    private async Task AddWordFromContextMenu(string wordToAdd)
+    {
+        // Appends new custom words into custom_user_terms.txt in AppData
+        await DictionaryService.AddWordToDictionaryFileAsync("custom_user_terms.txt", wordToAdd);
+
+        if (!activeDictionary.Contains(wordToAdd, StringComparer.OrdinalIgnoreCase))
+        {
+            activeDictionary = new List<string>(activeDictionary) { wordToAdd };
+        }
+    }
+
+    private void ResetContent()
+    {
+        gameItemHtml = "<p>Default game item description...</p>";
+    }
+
+    private void InsertSampleLore()
+    {
+        gameItemHtml = "<h3>Excalibur</h3><p>Forged in ancient times, this blade inflicts <b>100 holy damage</b>.</p>";
+    }
+}

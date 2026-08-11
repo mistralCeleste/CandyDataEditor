@@ -1,0 +1,192 @@
+﻿html, body {
+    font-family: 'Lora', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+a, .btn-link {
+    color: #006bb7;
+}
+
+.btn-primary {
+    color: #fff;
+    background-color: #1b6ec2;
+    border-color: #1861ac;
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+.content {
+    padding-top: 1.1rem;
+}
+
+h1:focus {
+    outline: none;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid #e50000;
+}
+
+.validation-message {
+    color: #e50000;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred."
+    }
+
+.status-bar-safe-area {
+    display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+    .status-bar-safe-area {
+        display: flex;
+        position: sticky;
+        top: 0;
+        height: env(safe-area-inset-top);
+        background-color: #f7f7f7;
+        width: 100%;
+        z-index: 1;
+    }
+
+    .flex-column, .navbar-brand {
+        padding-left: env(safe-area-inset-left);
+    }
+}
+
+/* CSS Multi-Column Text Layout */
+.editor-multi-column {
+    margin: 1rem 0;
+    padding: 0.5rem;
+    border: 1px dashed #e0e0e0;
+    border-radius: 4px;
+}
+
+/* Prevent paragraphs, headings, and images from breaking awkwardly across column splits */
+.editor-multi-column > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+/* Column counts */
+.editor-multi-column.cols-2 {
+    column-count: 2;
+    column-gap: 1.5rem;
+    column-rule: 1px solid #e0e0e0; /* Optional subtle vertical divider line */
+}
+
+.editor-multi-column.cols-3 {
+    column-count: 3;
+    column-gap: 1.5rem;
+    column-rule: 1px solid #e0e0e0;
+}
+
+/* Highlight section when editing inside multi-column */
+.editor-multi-column:focus-within {
+    border-color: #0d6efd;
+}
+
+/* 1. OTF Font Registration */
+@font-face {
+    font-family: 'GameIcons';
+    src: url('../fonts/GameIcons.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* 2. Ligatures (Icons, Arrows ->, <-, and Em-dash --) */
+.tiptap-container .game-icon-ligature {
+    font-family: 'GameIcons', sans-serif !important;
+    font-variant-ligatures: discretionary-ligs common-ligatures contextual !important;
+    font-feature-settings: "dlig" 1, "liga" 1, "calt" 1 !important;
+    text-rendering: optimizeLegibility !important;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
+    color: #0d6efd; /* Light accent tint for icons in editor */
+}
+
+/* 3. Action Menu - Parent (@ Action) */
+.tiptap-container .action-menu-parent {
+    text-align: center;
+    background-color: #2c3e50;
+    color: #ffffff;
+    font-weight: bold;
+    padding: 8px 16px;
+    margin: 12px 0;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 4. Action Menu - Child (@@ Sub-Action) */
+.tiptap-container .action-menu-child {
+    text-align: right;
+    background-color: #ecf0f1;
+    color: #2c3e50;
+    font-weight: 600;
+    padding: 6px 12px;
+    margin: 8px 0 8px auto;
+    width: fit-content;
+    border-left: 4px solid #3498db;
+    border-radius: 4px;
+}
+
+/* 5. Keyword Mark (==keyword== -> Bold + Underline) */
+.tiptap-container .keyword-mark {
+    font-weight: bold;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    color: #d63384;
+}
+
+.game-icon-preview {
+    font-family: 'GameIcons', sans-serif !important;
+    font-variant-ligatures: discretionary-ligs common-ligatures contextual !important;
+    font-feature-settings: "dlig" 1, "liga" 1, "calt" 1 !important;
+    color: #0d6efd;
+    font-size: 1.1rem;
+}
+
+.tiptap-container .ProseMirror-focused {
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+.custom-misspelled-word {
+    text-decoration: underline wavy #dc3545 !important;
+    text-decoration-color: #dc3545 !important;
+    text-underline-offset: 3px !important;
+}

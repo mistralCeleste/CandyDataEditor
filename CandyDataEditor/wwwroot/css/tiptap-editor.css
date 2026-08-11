@@ -1,0 +1,450 @@
+/* TipTapBlazor — CSS Custom Properties for Theming */
+:root {
+    --ttp-primary: #1976d2;
+    --ttp-border: #ddd;
+    --ttp-bg: #fff;
+    --ttp-toolbar-bg: #fafafa;
+    --ttp-toolbar-border: #e0e0e0;
+    --ttp-hover-bg: #e8e8e8;
+    --ttp-active-bg: #d0d0d0;
+    --ttp-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --ttp-font-size: 1rem;
+    --ttp-radius: 4px;
+    --ttp-placeholder-color: #767676;
+    --ttp-muted-color: #666;
+    --ttp-footer-color: #767676;
+    --ttp-code-bg: #2d2d2d;
+    --ttp-code-fg: #ccc;
+    --ttp-code-inline-bg: #f0f0f0;
+    --ttp-blockquote-color: #666;
+    --ttp-focus-ring: 2px solid var(--ttp-primary);
+    --ttp-mention-person-bg: rgba(25, 118, 210, 0.12);
+    --ttp-mention-person-color: #1976d2;
+    --ttp-mention-place-bg: rgba(76, 175, 80, 0.12);
+    --ttp-mention-place-color: #388e3c;
+    --ttp-mention-tag-bg: rgba(255, 152, 0, 0.12);
+    --ttp-mention-tag-color: #e65100;
+    --ttp-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Editor Wrapper */
+.ttp-editor-wrapper {
+    border: 1px solid var(--ttp-border);
+    border-radius: var(--ttp-radius);
+    background: var(--ttp-bg);
+    font-family: var(--ttp-font-family);
+    font-size: var(--ttp-font-size);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Toolbar */
+.ttp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    background: var(--ttp-toolbar-bg);
+    border-bottom: 1px solid var(--ttp-toolbar-border);
+    border-radius: var(--ttp-radius) var(--ttp-radius) 0 0;
+}
+
+.ttp-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding-right: 6px;
+    margin-right: 4px;
+    border-right: 1px solid var(--ttp-toolbar-border);
+}
+
+.ttp-toolbar-group:last-child {
+    border-right: none;
+    padding-right: 0;
+    margin-right: 0;
+}
+
+.ttp-toolbar-group--table {
+    position: relative;
+}
+
+.ttp-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: var(--ttp-radius);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    transition: background-color 0.15s;
+}
+
+.ttp-toolbar-btn:hover {
+    background: var(--ttp-hover-bg);
+}
+
+.ttp-toolbar-btn:focus-visible {
+    outline: var(--ttp-focus-ring);
+    outline-offset: -2px;
+}
+
+.ttp-toolbar-btn.active {
+    background: var(--ttp-active-bg);
+    color: var(--ttp-primary);
+}
+
+.ttp-toolbar-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* Toolbar Dropdown */
+.ttp-toolbar-dropdown {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.ttp-toolbar-dropdown select {
+    height: 32px;
+    padding: 2px 6px;
+    border: 1px solid var(--ttp-toolbar-border);
+    border-radius: var(--ttp-radius);
+    background: transparent;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+}
+
+.ttp-toolbar-dropdown select:hover {
+    background: var(--ttp-hover-bg);
+}
+
+.ttp-toolbar-dropdown select:focus-visible {
+    outline: var(--ttp-focus-ring);
+    outline-offset: -2px;
+}
+
+/* Color input */
+.ttp-toolbar-color {
+    width: 32px;
+    height: 32px;
+    padding: 2px;
+    border: 1px solid var(--ttp-toolbar-border);
+    border-radius: var(--ttp-radius);
+    background: transparent;
+    cursor: pointer;
+}
+
+.ttp-toolbar-color:focus-visible {
+    outline: var(--ttp-focus-ring);
+    outline-offset: -2px;
+}
+
+/* Editor Content Area */
+.ttp-editor-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.ttp-editor-content .ProseMirror {
+    padding: 12px 16px;
+    outline: none;
+    min-height: 100px;
+}
+
+.ttp-editor-content .ProseMirror > *:first-child {
+    margin-top: 0;
+}
+
+.ttp-editor-content .ProseMirror > *:last-child {
+    margin-bottom: 0;
+}
+
+/* Placeholder */
+.ttp-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--ttp-placeholder-color);
+    pointer-events: none;
+    height: 0;
+}
+
+/* Table Styles */
+.ttp-editor-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+.ttp-editor-content th,
+.ttp-editor-content td {
+    border: 1px solid var(--ttp-border);
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+    min-width: 80px;
+}
+
+.ttp-editor-content th {
+    background: var(--ttp-toolbar-bg);
+    font-weight: 600;
+}
+
+.ttp-editor-content .selectedCell {
+    background: rgba(25, 118, 210, 0.1);
+}
+
+.ttp-editor-content .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--ttp-primary);
+    cursor: col-resize;
+}
+
+.ttp-editor-content .tableWrapper {
+    overflow-x: auto;
+}
+
+/* Mention Styles */
+.ttp-mention {
+    display: inline;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(25, 118, 210, 0.12);
+    color: var(--ttp-primary);
+    font-weight: 500;
+    font-size: 0.9em;
+}
+
+.ttp-mention[data-category="person"] {
+    background: var(--ttp-mention-person-bg);
+    color: var(--ttp-mention-person-color);
+}
+
+.ttp-mention[data-category="place"] {
+    background: var(--ttp-mention-place-bg);
+    color: var(--ttp-mention-place-color);
+}
+
+.ttp-mention[data-category="tag"] {
+    background: var(--ttp-mention-tag-bg);
+    color: var(--ttp-mention-tag-color);
+}
+
+/* Mention Suggestion Popup */
+.ttp-mention-popup {
+    z-index: 9999;
+}
+
+.ttp-mention-list {
+    background: var(--ttp-bg);
+    border: 1px solid var(--ttp-border);
+    border-radius: var(--ttp-radius);
+    box-shadow: var(--ttp-shadow);
+    max-height: 200px;
+    overflow-y: auto;
+    min-width: 180px;
+}
+
+.ttp-mention-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.ttp-mention-item:hover,
+.ttp-mention-item.selected {
+    background: var(--ttp-hover-bg);
+}
+
+/* Task List */
+.ttp-editor-content ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: 0;
+}
+
+.ttp-editor-content ul[data-type="taskList"] li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.ttp-editor-content ul[data-type="taskList"] li label {
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+
+.ttp-editor-content ul[data-type="taskList"] li div {
+    flex: 1;
+}
+
+/* Code Block */
+.ttp-editor-content pre {
+    background: var(--ttp-code-bg);
+    color: var(--ttp-code-fg);
+    padding: 12px 16px;
+    border-radius: var(--ttp-radius);
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 0.9em;
+    overflow-x: auto;
+}
+
+.ttp-editor-content pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+}
+
+.ttp-editor-content code {
+    background: var(--ttp-code-inline-bg);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 0.9em;
+}
+
+/* Blockquote */
+.ttp-editor-content blockquote {
+    border-left: 3px solid var(--ttp-primary);
+    padding-left: 16px;
+    margin-left: 0;
+    color: var(--ttp-blockquote-color);
+}
+
+/* Horizontal Rule */
+.ttp-editor-content hr {
+    border: none;
+    border-top: 2px solid var(--ttp-border);
+    margin: 1em 0;
+}
+
+/* Image */
+.ttp-editor-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Word Count Footer */
+.ttp-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--ttp-footer-color);
+    border-top: 1px solid var(--ttp-toolbar-border);
+    background: var(--ttp-toolbar-bg);
+    border-radius: 0 0 var(--ttp-radius) var(--ttp-radius);
+}
+
+/* ReadOnly mode */
+.ttp-editor-wrapper.ttp-readonly .ttp-toolbar {
+    display: none;
+}
+
+.ttp-editor-wrapper.ttp-readonly .ttp-editor-content .ProseMirror {
+    cursor: default;
+}
+
+/* Click-outside overlay for menus */
+.ttp-menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+}
+
+/* Responsive: toolbar wraps at narrow widths */
+@media (max-width: 600px) {
+    .ttp-toolbar {
+        gap: 1px;
+        padding: 3px 4px;
+    }
+
+    .ttp-toolbar-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+
+    .ttp-toolbar-group {
+        padding-right: 4px;
+        margin-right: 2px;
+    }
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ttp-primary: #64b5f6;
+        --ttp-border: #444;
+        --ttp-bg: #1e1e1e;
+        --ttp-toolbar-bg: #2a2a2a;
+        --ttp-toolbar-border: #3a3a3a;
+        --ttp-hover-bg: #3a3a3a;
+        --ttp-active-bg: #4a4a4a;
+        --ttp-placeholder-color: #999;
+        --ttp-muted-color: #aaa;
+        --ttp-footer-color: #999;
+        --ttp-code-bg: #1a1a2e;
+        --ttp-code-fg: #d4d4d4;
+        --ttp-code-inline-bg: #333;
+        --ttp-blockquote-color: #aaa;
+        --ttp-mention-person-bg: rgba(100, 181, 246, 0.15);
+        --ttp-mention-person-color: #90caf9;
+        --ttp-mention-place-bg: rgba(129, 199, 132, 0.15);
+        --ttp-mention-place-color: #a5d6a7;
+        --ttp-mention-tag-bg: rgba(255, 183, 77, 0.15);
+        --ttp-mention-tag-color: #ffb74d;
+        --ttp-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* Table dropdown menu */
+.ttp-table-menu {
+    position: absolute;
+    z-index: 100;
+    background: var(--ttp-bg);
+    border: 1px solid var(--ttp-border);
+    border-radius: var(--ttp-radius);
+    box-shadow: var(--ttp-shadow);
+    padding: 4px;
+    min-width: 160px;
+}
+
+.ttp-table-menu button {
+    display: block;
+    width: 100%;
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    border-radius: 2px;
+    color: inherit;
+}
+
+.ttp-table-menu button:hover {
+    background: var(--ttp-hover-bg);
+}
+
+.ttp-table-menu button:focus-visible {
+    outline: var(--ttp-focus-ring);
+    outline-offset: -2px;
+}

@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@farscrl/tiptap-extension-spellchecker": "^2.0.2",
+    "@tiptap/core": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
+    "esbuild": "^0.28.2",
+    "tiptap-markdown": "^0.9.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
