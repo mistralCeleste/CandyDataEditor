@@ -1,17 +1,27 @@
-﻿@inherits LayoutComponentBase
+﻿<!-- Layout/MainLayout.razor -->
+@inherits LayoutComponentBase
 
 <div class="page">
     <div class="sidebar">
         <NavMenu />
     </div>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+    <main class="d-flex flex-column flex-grow-1">
+        <!-- GLOBAL RIBBON MENU BAR AT TOP OF APP -->
+        <RibbonMenuBar OnDatabaseChanged="HandleDatabaseChanged" />
 
-        <article class="content px-4">
+        <article class="content px-4 flex-grow-1">
             @Body
         </article>
     </main>
 </div>
+
+@code {
+    private void HandleDatabaseChanged(string newPath)
+    {
+        // Triggers UI refresh across components when database path changes
+        StateHasChanged();
+    }
+
+
+}

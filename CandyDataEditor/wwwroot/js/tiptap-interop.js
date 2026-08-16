@@ -101,6 +101,9 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper) {
             const markdown = serializeDocumentToCustomMarkdown(editor);
             dotnetHelper.invokeMethodAsync('OnContentChanged', html, markdown);
         },
+        onBlur: ({ editor, event }) => {
+            dotnetHelper.invokeMethodAsync('OnEditorBlurred');
+        }
     });
 
     window.tiptapInstances[elementId] = editor;

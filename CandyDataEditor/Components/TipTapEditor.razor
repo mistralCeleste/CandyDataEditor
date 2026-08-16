@@ -215,6 +215,7 @@
     [Parameter] public EventCallback<string> MarkdownValueChanged { get; set; }
     [Parameter] public List<string> GameDictionaryWords { get; set; } = new();
     [Parameter] public EventCallback<string> OnAddWordRequested { get; set; }
+    [Parameter] public EventCallback OnBlur { get; set; }
 
     // View Switching logic
     private async Task SwitchViewMode(ViewMode newMode)
@@ -271,6 +272,18 @@
         string updated = e.Value?.ToString() ?? string.Empty;
         Value = updated;
         await ValueChanged.InvokeAsync(updated);
+    }
+
+    /// <summary>
+    /// Invoked by tiptap-interop.js when TipTap editor loses focus
+    /// </summary>
+    [JSInvokable]
+    public async Task OnEditorBlurred()
+    {
+        if (OnBlur.HasDelegate)
+        {
+            await OnBlur.InvokeAsync();
+        }
     }
 
     [JSInvokable]

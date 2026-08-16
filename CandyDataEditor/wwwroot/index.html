@@ -12,7 +12,14 @@
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="CandyDataEditor.styles.css" />
+    <link rel="stylesheet" href="css/dark-mode.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
+
+    <script>
+        window.setDarkMode = function (isDark) {
+            document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+        };
+    </script>
 </head>
 
 <body>

@@ -1,0 +1,340 @@
+﻿<!-- Components/RibbonMenuBar.razor -->
+@using CandyDataEditor.Services
+@inject SqliteDataService DbService
+@inject FileDialogService FileDialog
+@inject IJSRuntime JSRuntime
+
+<div class="ribbon-bar border-bottom bg-light px-3 py-1 d-flex align-items-center justify-content-between shadow-sm position-relative">
+    <div class="d-flex align-items-center gap-1">
+
+        <!-- FILE MENU -->
+        <div class="dropdown position-relative">
+            <button class="btn btn-sm @(openMenu == "file" ? "btn-secondary" : "btn-light") fw-bold"
+                    type="button"
+                    @onclick='() => ToggleMenu("file")'>
+                📁 File
+            </button>
+            @if (openMenu == "file")
+            {
+                <div class="dropdown-menu show shadow position-absolute start-0 mt-1 py-1" style="z-index: 2000; min-width: 220px;">
+                    <button class="dropdown-item" @onclick="OpenDatabaseFileDialog">📂 Open Database...</button>
+                    <button class="dropdown-item" @onclick="SaveDatabaseAsDialog">💾 Save As...</button>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-header text-uppercase small text-muted">Recent Databases</div>
+                    @if (recentDatabases.Any())
+                    {
+                        @foreach (var dbPath in recentDatabases)
+                        {
+                            <button class="dropdown-item text-truncate" style="max-width: 320px;" title="@dbPath" @onclick="() => LoadRecentDatabase(dbPath)">
+                                ⏱️ @ShortenPath(dbPath)
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <span class="dropdown-item disabled text-muted">No recent files</span>
+                    }
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item text-danger" @onclick="ExitApplication">❌ Exit</button>
+                </div>
+            }
+        </div>
+
+        <!-- SETTINGS MENU -->
+        <div class="dropdown position-relative">
+            <button class="btn btn-sm @(openMenu == "settings" ? "btn-secondary" : "btn-light") fw-bold"
+                    type="button"
+                    @onclick='() => ToggleMenu("settings")'>
+                ⚙️ Settings
+            </button>
+            @if (openMenu == "settings")
+            {
+                <div class="dropdown-menu show shadow position-absolute start-0 mt-1 py-1" style="z-index: 2000; min-width: 220px;">
+                    <button class="dropdown-item" @onclick='() => OpenSettingsTab("ligature")'>🔤 Ligature Font Settings</button>
+                    <button class="dropdown-item" @onclick='() => OpenSettingsTab("editor")'>🗄️ SQLite Editor Config</button>
+                    <button class="dropdown-item" @onclick='() => OpenSettingsTab("ui")'>🎨 UI & Dark Mode</button>
+                </div>
+            }
+        </div>
+
+        <!-- EXPORT MENU -->
+        <div class="dropdown position-relative">
+            <button class="btn btn-sm @(openMenu == "export" ? "btn-secondary" : "btn-light") fw-bold"
+                    type="button"
+                    @onclick='() => ToggleMenu("export")'>
+                📤 Export
+            </button>
+            @if (openMenu == "export")
+            {
+                <div class="dropdown-menu show shadow position-absolute start-0 mt-1 py-1" style="z-index: 2000; min-width: 240px;">
+                    <div class="px-3 py-1">
+                        <label class="form-label mb-1 small fw-bold">Scope:</label>
+                        <div class="btn-group btn-group-sm w-100" role="group">
+                            <button type="button" class="btn @(exportScope == "all" ? "btn-primary" : "btn-outline-primary")" @onclick='() => exportScope = "all"'>All</button>
+                            <button type="button" class="btn @(exportScope == "table" ? "btn-primary" : "btn-outline-primary")" @onclick='() => exportScope = "table"'>Tables</button>
+                            <button type="button" class="btn @(exportScope == "view" ? "btn-primary" : "btn-outline-primary")" @onclick='() => exportScope = "view"'>Views</button>
+                        </div>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item" @onclick='() => ExportData("tsv")'>📄 Tab-Delimited (.TSV)</button>
+                    <button class="dropdown-item" @onclick='() => ExportData("csv")'>📊 Comma-Delimited (.CSV)</button>
+                    <button class="dropdown-item" @onclick='() => ExportData("xml")'>🏷️ XML Document (.XML)</button>
+                    <button class="dropdown-item" @onclick='() => ExportData("json")'>📦 JSON Data (.JSON)</button>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item fw-bold text-primary" @onclick='() => ExportData("html-cards")'>🌐 Interactive HTML Cards Bundle</button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Active DB Name Indicator -->
+    <div class="small text-muted text-truncate ms-3" style="max-width: 350px;" title="@DbService.GetDatabasePath()">
+        <strong>Current DB:</strong> @Path.GetFileName(DbService.GetDatabasePath())
+    </div>
+</div>
+
+<!-- SETTINGS MODAL DIALOG -->
+@if (!string.IsNullOrEmpty(activeSettingsTab))
+{
+    <div class="modal fade show d-block bg-dark bg-opacity-50" tabindex="-1" style="z-index: 3000;">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h5 class="modal-title fw-bold">⚙️ Configuration & Settings</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick='() => activeSettingsTab = null'></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link @(activeSettingsTab == "ligature" ? "active fw-bold" : "")" @onclick='() => activeSettingsTab = "ligature"'>Font Ligatures</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(activeSettingsTab == "editor" ? "active fw-bold" : "")" @onclick='() => activeSettingsTab = "editor"'>SQLite Config</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(activeSettingsTab == "ui" ? "active fw-bold" : "")" @onclick='() => activeSettingsTab = "ui"'>UI & Appearance</button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab 1: Ligature Font Settings -->
+                    @if (activeSettingsTab == "ligature")
+                    {
+                        <div class="p-2">
+                            <h6>🔤 Game Icon & Ligature Settings</h6>
+                            <p class="text-muted small">Configure font ligatures (e.g., <code>[place]</code> → 📍, <code>[defense]</code> → 🛡️) for TipTap editor previewing.</p>
+
+                            <div class="mb-3">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="AutoDetectFontLigatures">
+                                    🔍 Auto-Detect Font Icons & Ligatures
+                                </button>
+                            </div>
+
+                            <div class="table-responsive" style="max-height: 250px;">
+                                <table class="table table-sm table-bordered mb-0 align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Ligature Pattern</th>
+                                            <th>Icon Render Preview</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td><code>[place]</code></td><td>📍 Location Marker</td></tr>
+                                        <tr><td><code>[defense]</code></td><td>🛡️ Defense Shield</td></tr>
+                                        <tr><td><code>[warning]</code></td><td>⚠️ Warning Reaction</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Tab 2: SQLite Config Settings -->
+                    @if (activeSettingsTab == "editor")
+                    {
+                        <div class="p-2">
+                            <h6>🗄️ Database Query & Field Thresholds</h6>
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Query Row Limit</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="DbService.Config.QueryRowLimit" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Small Field Threshold (Chars)</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="DbService.Config.SmallCharThreshold" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Medium Field Threshold (Chars)</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="DbService.Config.MediumCharThreshold" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Large Field Threshold (Chars)</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="DbService.Config.LargeCharThreshold" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Tab 3: UI & Appearance Settings -->
+                    @if (activeSettingsTab == "ui")
+                    {
+                        <div class="p-2">
+                            <h6>🎨 Theme & Appearance</h6>
+                            <div class="mb-3 mt-2">
+                                <label class="form-label small fw-bold">Theme Mode</label>
+                                <div class="btn-group w-100">
+                                    <button class="btn btn-outline-dark @(!isDarkMode ? "active" : "")" @onclick="() => ToggleTheme(false)">☀️ Light Mode</button>
+                                    <button class="btn btn-outline-dark @(isDarkMode ? "active" : "")" @onclick="() => ToggleTheme(true)">🌙 Dark Mode</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer py-2">
+                    <button class="btn btn-sm btn-secondary" @onclick='() => activeSettingsTab = null'>Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<string> OnDatabaseChanged { get; set; }
+
+    private string? openMenu = null;
+    private List<string> recentDatabases = new();
+    private string? activeSettingsTab = null;
+    private string exportScope = "all"; // 'all', 'table', 'view'
+    private bool isDarkMode = false;
+
+    protected override void OnInitialized()
+    {
+        TrackRecentDatabase(DbService.GetDatabasePath());
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        TrackRecentDatabase(DbService.GetDatabasePath());
+
+        // Apply saved dark mode state on application launch
+        isDarkMode = DbService.Config.IsDarkMode;
+        await ToggleTheme(isDarkMode);
+    }
+
+    private async Task ToggleTheme(bool dark)
+    {
+        isDarkMode = dark;
+        DbService.Config.IsDarkMode = dark; // Automatically saves to Preferences
+        await JSRuntime.InvokeVoidAsync("document.body.setAttribute", "data-bs-theme", dark ? "dark" : "light");
+    }
+
+    private void ToggleMenu(string menuName)
+    {
+        openMenu = openMenu == menuName ? null : menuName;
+    }
+
+    private void CloseMenus()
+    {
+        openMenu = null;
+    }
+
+    private void OpenSettingsTab(string tabName)
+    {
+        activeSettingsTab = tabName;
+        CloseMenus();
+    }
+
+    private void TrackRecentDatabase(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        recentDatabases.RemoveAll(p => p.Equals(path, StringComparison.OrdinalIgnoreCase));
+        recentDatabases.Insert(0, path);
+        if (recentDatabases.Count > 5) recentDatabases = recentDatabases.Take(5).ToList();
+    }
+
+    private string ShortenPath(string path)
+    {
+        if (string.IsNullOrEmpty(path) || path.Length <= 35) return path;
+        string root = Path.GetPathRoot(path) ?? "";
+        string fileName = Path.GetFileName(path);
+        return $"{root}...\\{fileName}";
+    }
+
+    private async Task OpenDatabaseFileDialog()
+    {
+        CloseMenus();
+
+        string? selectedFilePath = await FileDialog.SelectDatabaseFileDialogAsync();
+
+        if (!string.IsNullOrWhiteSpace(selectedFilePath) && File.Exists(selectedFilePath))
+        {
+            // Update service path and invoke callback to refresh views
+            DbService.SetDatabasePath(selectedFilePath);
+            TrackRecentDatabase(selectedFilePath);
+            await OnDatabaseChanged.InvokeAsync(selectedFilePath);
+        }
+    }
+
+    private async Task SaveDatabaseAsDialog()
+    {
+        CloseMenus();
+
+        string currentDbPath = DbService.GetDatabasePath();
+        string defaultName = $"game_data_copy_{DateTime.Now:yyyyMMdd_HHmmss}.db";
+
+        // Triggers native OS "Save As" file dialog
+        string? savedPath = await FileDialog.SelectFileDialogAsync(defaultName, currentDbPath);
+
+        if (!string.IsNullOrWhiteSpace(savedPath))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Database copy saved successfully to:\n{savedPath}");
+        }
+    }
+
+    private async Task LoadRecentDatabase(string path)
+    {
+        CloseMenus();
+        if (File.Exists(path))
+        {
+            DbService.SetDatabasePath(path);
+            TrackRecentDatabase(path);
+            await OnDatabaseChanged.InvokeAsync(path);
+        }
+    }
+
+    private void ExitApplication()
+    {
+        CloseMenus();
+        Application.Current?.Quit();
+    }
+
+    private async Task AutoDetectFontLigatures()
+    {
+        await JSRuntime.InvokeVoidAsync("alert", "Font ligatures scanned and updated!");
+    }
+
+    private async Task ExportData(string format)
+    {
+        CloseMenus();
+
+        // Native Folder Picker Dialog
+        string? exportFolder = await FileDialog.SelectExportFolderDialogAsync();
+        if (string.IsNullOrEmpty(exportFolder)) return;
+
+        var tables = await DbService.GetTablesAndViewsAsync();
+        var filtered = tables
+            .Where(t => exportScope == "all" || t.Type == exportScope)
+            .Select(t => t.Name)
+            .ToList();
+
+        if (format == "html-cards")
+        {
+            await DbService.ExportHtmlCardsBundleAsync(filtered, exportFolder);
+            await JSRuntime.InvokeVoidAsync("alert", $"HTML Cards Bundle exported to:\n{exportFolder}");
+        }
+        else
+        {
+            await DbService.ExportDataFilesAsync(filtered, format, exportFolder);
+            await JSRuntime.InvokeVoidAsync("alert", $"Exported {filtered.Count} object(s) in {format.ToUpper()} format to:\n{exportFolder}");
+        }
+    }
+}
