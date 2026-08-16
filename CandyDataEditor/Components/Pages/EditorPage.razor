@@ -1,0 +1,721 @@
+﻿@page "/editor"
+@page "/editor/{TableName}"
+@using System.Web
+@using CandyDataEditor.Services
+@inject SqliteDataService DbService
+@inject NavigationManager NavManager
+
+<PageTitle>SQLite Record Editor</PageTitle>
+
+<div class="container-fluid my-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h3>🗄️ <code>@TableName</code></h3>
+    </div>
+
+    <div class="row">
+        <!-- Main Workspace Area -->
+        <div class="col-md-9">
+            @if (editingRow == null)
+            {
+                <!-- TABLE GRID VIEW -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Table: @selectedTable</span>
+                        <div class="d-flex align-items-center gap-2">
+                            @if (tableData != null)
+                            {
+                                <small class="text-muted me-2">Total Rows: <strong>@tableData.Rows.Count</strong></small>
+                            }
+                            <button class="btn btn-sm btn-success" @onclick="CreateNewRecord">➕ New Record</button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (isLoadingData)
+                        {
+                            <div class="p-4 text-center text-muted">Loading data...</div>
+                        }
+                        else if (tableData != null && tableData.Columns.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped table-bordered mb-0 align-middle">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            @foreach (var col in tableData.Columns)
+                                            {
+                                                <th>@col</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in tableData.Rows)
+                                        {
+                                            <tr style="cursor: pointer;" @onclick="() => OpenRecordEditor(row)">
+                                                @foreach (var col in tableData.Columns)
+                                                {
+                                                    <td class="text-truncate" style="max-width: 200px;" title="@row[col]">
+                                                        @row[col]
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- VERTICAL RECORD EDITOR VIEW -->
+                <div class="card shadow-sm mb-4" @key='@($"{selectedTable}_{FormatKeyMapLabel(originalKeys)}")'>
+                    <!-- STICKY OPERATIONS HEADER BAR -->
+                    <div class="card-header bg-primary text-white sticky-top shadow-sm py-2" style="z-index: 1020;">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold me-2">Record: @selectedTable</span>
+
+                                <!-- Prev / Next Record Buttons -->
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-secondary" title="Previous Record" @onclick="NavigateToPreviousRecord" disabled="@(!HasPreviousRecord)">◀ Prev</button>
+                                    <button class="btn btn-outline-secondary" title="Next Record" @onclick="NavigateToNextRecord" disabled="@(!HasNextRecord)">Next ▶</button>
+                                </div>
+
+                                <!-- Direct Primary Key Jump Selector -->
+                                @if (tableRecordKeys.ContainsKey(selectedTable) && tableRecordKeys[selectedTable].Any())
+                                {
+                                    <select class="form-select form-select-sm w-auto" @onchange="OnPkJumpSelected">
+                                        @foreach (var km in tableRecordKeys[selectedTable])
+                                        {
+                                            string l = FormatKeyMapLabel(km);
+                                            bool isSel = IsMatchingKeys(km, originalKeys);
+                                            <option value="@l" selected="@isSel">@l</option>
+                                        }
+                                    </select>
+                                }
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2">
+                                <!-- Auto-Save Toggle -->
+                                <div class="form-check form-switch me-2 text-white">
+                                    <input class="form-check-input" type="checkbox" id="autoSaveToggle" @bind="autoSaveEnabled" />
+                                    <label class="form-check-label small fw-bold" for="autoSaveToggle">
+                                        Auto-Save: @(autoSaveEnabled ? "ON" : "OFF")
+                                    </label>
+                                </div>
+
+                                <button class="btn btn-sm btn-success" @onclick="SaveCurrentRecord">💾 Save</button>
+                                <button class="btn btn-sm btn-info text-white" @onclick="CloneCurrentRecord">📋 Clone</button>
+                                <button class="btn btn-sm btn-danger" @onclick="DeleteCurrentRecord">🗑️ Delete</button>
+                                <button class="btn btn-sm btn-outline-light" @onclick="CloseRecordEditor">❌ Back</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Global Save Error Banner -->
+                    @if (!string.IsNullOrEmpty(saveErrorMessage))
+                    {
+                        <div class="alert alert-danger m-3 mb-0" role="alert">
+                            <strong>⚠️ Error:</strong> @saveErrorMessage
+                        </div>
+                    }
+
+                    <!-- MAIN FIELDS LIST -->
+                    <div class="card-body">
+                        @if (tableData != null)
+                        {
+                            <div class="d-flex flex-column gap-3">
+                                @foreach (var col in tableData.Columns)
+                                {
+                                    var meta = columnMetadata.TryGetValue(col, out var m) ? m : new ColumnMetadata();
+                                    string fieldValue = GetFieldValue(col);
+                                    int lineCount = DbService.Config.GetLineCountForText(fieldValue);
+                                    string fieldHeightStyle = $"min-height: {lineCount * 1.6}rem;";
+
+                                    <div class="border rounded p-3 @(meta.IsReadOnly || meta.IsGenerated ? "bg-light" : "bg-light")">
+                                        <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                            <span>@col</span>
+                                            <div>
+                                                @if (meta.IsPrimaryKey)
+                                                {
+                                                    <span class="badge bg-primary me-1">Primary Key</span>
+                                                }
+                                                @if (meta.IsGenerated)
+                                                {
+                                                    <span class="badge bg-secondary me-1">Generated Field</span>
+                                                }
+                                                @if (meta.IsReadOnly && !meta.IsGenerated)
+                                                {
+                                                    <span class="badge bg-dark me-1">(Read-Only)</span>
+                                                }
+                                            </div>
+                                        </label>
+
+                                        @if (meta.IsGenerated || meta.IsReadOnly)
+                                        {
+                                            <input type="text" class="form-control card-body" readonly value="@fieldValue" />
+                                        }
+                                        else
+                                        {
+                                            <div class="card-body border rounded p-2" style="@fieldHeightStyle">
+                                                <TipTapEditor MarkdownValue="@GetFieldValue(col)"
+                                                              MarkdownValueChanged="(val) => SetFieldValue(col, val)"
+                                                              GameDictionaryWords="activeDictionary"
+                                                              OnBlur="OnFieldFocusLost" />
+                                            </div>
+                                        }
+
+                                        @if (fieldErrorMessages.TryGetValue(col, out string? fieldError))
+                                        {
+                                            <div class="text-danger small mt-1 fw-bold">
+                                                ❌ @fieldError
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- UNSAVED CHANGES WARNING MODAL -->
+@if (showUnsavedModal)
+{
+    <div class="modal fade show d-block tab-index-1 bg-dark bg-opacity-50" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold">⚠️ Unsaved Changes</h5>
+                </div>
+                <div class="modal-body">
+                    You have modified fields in this record without saving. What would you like to do?
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="RevertAndProceed">Discard Changes</button>
+                    <button class="btn btn-primary" @onclick="SaveAndProceed">Save & Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .bg-light-gray {
+        background-color: #e9ecef !important;
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    private List<DbObjectInfo> dbObjects = new();
+    private string selectedTable = string.Empty;
+    private string expandedTable = string.Empty;
+    private TableDataResult? tableData;
+    private Dictionary<string, ColumnMetadata> columnMetadata = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, List<Dictionary<string, string>>> tableRecordKeys = new(StringComparer.OrdinalIgnoreCase);
+
+    private string dbPath = string.Empty;
+    private bool isLoadingTables = true;
+    private bool isLoadingData = false;
+
+    // Filters
+    private string searchFilter = string.Empty;
+    private string typeFilter = "all"; // 'all', 'table', 'view'
+
+    // Record Editing State
+    private Dictionary<string, string>? editingRow = null;
+    private Dictionary<string, string> originalRowSnapshot = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> originalKeys = new(StringComparer.OrdinalIgnoreCase);
+    private List<string> activeDictionary = new();
+    [Parameter] public string? TableName { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Id { get; set; } // Matches single PKs like ?Id=10
+
+    // Auto-Save & Change Tracking
+    private bool autoSaveEnabled = false;
+    private bool showUnsavedModal = false;
+    private Dictionary<string, string>? pendingNavigationTargetKey = null;
+    private string? pendingNavigationTable = null;
+
+    // Error Messages
+    private string? saveErrorMessage = null;
+    private Dictionary<string, string> fieldErrorMessages = new(StringComparer.OrdinalIgnoreCase);
+
+    private IEnumerable<DbObjectInfo> FilteredObjects => dbObjects
+        .Where(o => typeFilter == "all" || o.Type == typeFilter)
+        .Where(o => string.IsNullOrWhiteSpace(searchFilter) || o.Name.Contains(searchFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        dbPath = DbService.GetDatabasePath();
+        dbObjects = await DbService.GetTablesAndViewsAsync();
+        isLoadingTables = false;
+
+        if (dbObjects.Any())
+        {
+            await SelectTable(dbObjects.First().Name);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrEmpty(TableName)) return;
+
+        // 1. If table changed, load table schema and record keys
+        if (selectedTable != TableName)
+        {
+            await SelectTable(TableName);
+        }
+
+        // 2. Parse primary keys from URL Query Parameters
+        var uri = NavManager.ToAbsoluteUri(NavManager.Uri);
+        var queryParams = HttpUtility.ParseQueryString(uri.Query);
+
+        if (queryParams.Count > 0)
+        {
+            var targetKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string? key in queryParams.AllKeys)
+            {
+                if (!string.IsNullOrEmpty(key) && queryParams[key] != null)
+                {
+                    targetKeys[key] = queryParams[key]!;
+                }
+            }
+
+            if (targetKeys.Any())
+            {
+                // Load record into vertical editor
+                await ExecuteNavigationForTable(TableName, targetKeys);
+            }
+        }
+        else
+        {
+            // No PK in URL: Show full table grid view
+            CloseRecordEditor();
+        }
+    }
+
+    private async Task SelectTable(string tableName)
+    {
+        editingRow = null;
+        originalRowSnapshot.Clear();
+        originalKeys.Clear();
+        saveErrorMessage = null;
+        fieldErrorMessages.Clear();
+
+        selectedTable = tableName;
+        isLoadingData = true;
+
+        tableData = await DbService.GetTableDataAsync(tableName);
+        columnMetadata = await DbService.GetColumnMetadataAsync(tableName);
+
+        var pkCols = columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key).ToList();
+        if (!pkCols.Any() && tableData.Columns.Any()) pkCols.Add(tableData.Columns.First());
+
+        tableRecordKeys[tableName] = await DbService.GetRecordKeysAsync(tableName, pkCols);
+
+        isLoadingData = false;
+    }
+
+    private string GetFieldValue(string columnName)
+    {
+        if (editingRow != null && editingRow.TryGetValue(columnName, out var val))
+        {
+            return val ?? string.Empty;
+        }
+        return string.Empty;
+    }
+
+    private void SetFieldValue(string columnName, string value)
+    {
+        if (editingRow != null)
+        {
+            editingRow[columnName] = value;
+        }
+    }
+
+    private async Task ToggleTableAccordion(string tableName)
+    {
+        if (expandedTable == tableName)
+        {
+            expandedTable = string.Empty;
+        }
+        else
+        {
+            expandedTable = tableName;
+            if (selectedTable != tableName)
+            {
+                await SelectTable(tableName);
+            }
+        }
+    }
+
+    private void OpenRecordEditor(Dictionary<string, string> row)
+    {
+        saveErrorMessage = null;
+        fieldErrorMessages.Clear();
+
+        editingRow = new Dictionary<string, string>(row, StringComparer.OrdinalIgnoreCase);
+        originalRowSnapshot = new Dictionary<string, string>(row, StringComparer.OrdinalIgnoreCase);
+
+        originalKeys.Clear();
+        foreach (var kvp in columnMetadata)
+        {
+            if (kvp.Value.IsPrimaryKey && row.ContainsKey(kvp.Key))
+            {
+                originalKeys[kvp.Key] = row[kvp.Key];
+            }
+        }
+    }
+
+    private void CloseRecordEditor()
+    {
+        editingRow = null;
+        originalRowSnapshot.Clear();
+        originalKeys.Clear();
+        saveErrorMessage = null;
+        fieldErrorMessages.Clear();
+    }
+
+    private bool HasUnsavedChanges()
+    {
+        if (editingRow == null) return false;
+        foreach (var kvp in editingRow)
+        {
+            string orig = originalRowSnapshot.TryGetValue(kvp.Key, out var oVal) ? NormalizeValue(oVal) : "";
+            string curr = NormalizeValue(kvp.Value);
+
+            if (!string.Equals(curr, orig, StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    private string NormalizeValue(string? val)
+    {
+        if (string.IsNullOrWhiteSpace(val)) return "";
+        string trimmed = val.Trim();
+        if (trimmed == "<p></p>" || trimmed == "<p><br></p>" || trimmed == "<br>") return "";
+        return trimmed;
+    }
+
+    private async Task OnFieldFocusLost()
+    {
+        if (editingRow == null) return;
+
+        var recalculatedGenFields = await DbService.RecalculateGeneratedFieldsAsync(selectedTable, editingRow);
+
+        foreach (var kvp in recalculatedGenFields)
+        {
+            editingRow[kvp.Key] = kvp.Value;
+        }
+
+        if (autoSaveEnabled && HasUnsavedChanges())
+        {
+            await SaveCurrentRecord();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task RequestRecordNavigationForTable(string targetTable, Dictionary<string, string>? targetKeyMap)
+    {
+        if (!autoSaveEnabled && HasUnsavedChanges())
+        {
+            pendingNavigationTable = targetTable;
+            pendingNavigationTargetKey = targetKeyMap;
+            showUnsavedModal = true;
+            return;
+        }
+
+        if (autoSaveEnabled && HasUnsavedChanges())
+        {
+            await SaveCurrentRecord();
+        }
+
+        await ExecuteNavigationForTable(targetTable, targetKeyMap);
+    }
+
+    private async Task RequestRecordNavigation(Dictionary<string, string>? targetKeyMap)
+    {
+        await RequestRecordNavigationForTable(selectedTable, targetKeyMap);
+    }
+
+    private async Task ExecuteNavigationForTable(string targetTable, Dictionary<string, string>? targetKeyMap)
+    {
+        if (targetKeyMap == null)
+        {
+            CloseRecordEditor();
+            return;
+        }
+
+        if (selectedTable != targetTable || tableData == null)
+        {
+            await SelectTable(targetTable);
+        }
+
+        var record = await DbService.GetRecordByKeysAsync(targetTable, targetKeyMap);
+
+        if (record != null)
+        {
+            saveErrorMessage = null;
+            fieldErrorMessages.Clear();
+
+            originalKeys = new Dictionary<string, string>(targetKeyMap, StringComparer.OrdinalIgnoreCase);
+            editingRow = new Dictionary<string, string>(record, StringComparer.OrdinalIgnoreCase);
+
+            // KEY FIX: Update original baseline snapshot on every navigation
+            originalRowSnapshot = new Dictionary<string, string>(record, StringComparer.OrdinalIgnoreCase);
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveAndProceed()
+    {
+        showUnsavedModal = false;
+        bool saved = await SaveCurrentRecord();
+        if (saved)
+        {
+            string targetTable = pendingNavigationTable ?? selectedTable;
+            var targetKey = pendingNavigationTargetKey;
+            pendingNavigationTable = null;
+            pendingNavigationTargetKey = null;
+
+            await ExecuteNavigationForTable(targetTable, targetKey);
+        }
+    }
+
+    private async Task RevertAndProceed()
+    {
+        showUnsavedModal = false;
+        string targetTable = pendingNavigationTable ?? selectedTable;
+        var targetKey = pendingNavigationTargetKey;
+        pendingNavigationTable = null;
+        pendingNavigationTargetKey = null;
+
+        await ExecuteNavigationForTable(targetTable, targetKey);
+    }
+
+    private async Task<bool> SaveCurrentRecord()
+    {
+        if (editingRow == null) return false;
+
+        saveErrorMessage = null;
+        fieldErrorMessages.Clear();
+
+        var writableValues = editingRow
+            .Where(kvp =>
+            {
+                if (columnMetadata.TryGetValue(kvp.Key, out var meta))
+                {
+                    return !meta.IsGenerated && !meta.IsReadOnly;
+                }
+                return !kvp.Key.Equals("Full Id", StringComparison.OrdinalIgnoreCase);
+            })
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+
+        string? error = null;
+
+        if (originalKeys == null || originalKeys.Count == 0)
+        {
+            error = await DbService.InsertRecordAsync(selectedTable, writableValues);
+        }
+        else
+        {
+            error = await DbService.SaveRecordAsync(selectedTable, originalKeys, writableValues);
+        }
+
+        if (error != null)
+        {
+            saveErrorMessage = error;
+            if (error.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase) ||
+                error.Contains("PRIMARY KEY", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var col in columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key))
+                {
+                    fieldErrorMessages[col] = "Key conflict! This key combination already exists.";
+                }
+            }
+            return false;
+        }
+
+        originalRowSnapshot = new Dictionary<string, string>(editingRow, StringComparer.OrdinalIgnoreCase);
+        originalKeys.Clear();
+        foreach (var kvp in columnMetadata.Where(c => c.Value.IsPrimaryKey))
+        {
+            if (editingRow.ContainsKey(kvp.Key))
+                originalKeys[kvp.Key] = editingRow[kvp.Key];
+        }
+
+        var pkCols = columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key).ToList();
+        if (!pkCols.Any() && tableData != null && tableData.Columns.Any())
+            pkCols.Add(tableData.Columns.First());
+
+        tableRecordKeys[selectedTable] = await DbService.GetRecordKeysAsync(selectedTable, pkCols);
+        return true;
+    }
+
+    private async Task CreateNewRecord()
+    {
+        var newRow = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var col in tableData!.Columns)
+        {
+            newRow[col] = col.Equals("Version", StringComparison.OrdinalIgnoreCase) ? "1" : "";
+        }
+
+        OpenRecordEditor(newRow);
+        originalKeys.Clear();
+    }
+
+    private async Task CloneCurrentRecord()
+    {
+        if (editingRow == null) return;
+
+        var clonedRow = new Dictionary<string, string>(editingRow, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pkCol in columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key))
+        {
+            if (clonedRow.ContainsKey(pkCol))
+            {
+                clonedRow[pkCol] = clonedRow[pkCol] + "_COPY";
+            }
+        }
+
+        var keysToRemove = clonedRow.Keys
+            .Where(k => (columnMetadata.TryGetValue(k, out var m) && m.IsGenerated) || k.Equals("Full Id", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        foreach (var key in keysToRemove)
+        {
+            clonedRow.Remove(key);
+        }
+
+        OpenRecordEditor(clonedRow);
+        originalKeys.Clear();
+    }
+
+    private async Task DeleteCurrentRecord()
+    {
+        if (editingRow == null) return;
+
+        string? err = await DbService.DeleteRecordAsync(selectedTable, originalKeys);
+        if (err != null)
+        {
+            saveErrorMessage = err;
+            return;
+        }
+
+        editingRow = null;
+        await SelectTable(selectedTable);
+    }
+
+    // Prev / Next Navigation Helpers
+    private bool HasPreviousRecord => GetCurrentRecordIndex() > 0;
+    private bool HasNextRecord => tableRecordKeys.ContainsKey(selectedTable) && GetCurrentRecordIndex() < tableRecordKeys[selectedTable].Count - 1;
+
+    private int GetCurrentRecordIndex()
+    {
+        if (!tableRecordKeys.ContainsKey(selectedTable)) return -1;
+        var list = tableRecordKeys[selectedTable];
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (IsMatchingKeys(list[i], originalKeys)) return i;
+        }
+        return -1;
+    }
+
+    private async Task NavigateToPreviousRecord()
+    {
+        int idx = GetCurrentRecordIndex();
+        if (idx > 0)
+        {
+            await RequestRecordNavigation(tableRecordKeys[selectedTable][idx - 1]);
+        }
+    }
+
+    private async Task NavigateToNextRecord()
+    {
+        int idx = GetCurrentRecordIndex();
+        if (idx >= 0 && idx < tableRecordKeys[selectedTable].Count - 1)
+        {
+            await RequestRecordNavigation(tableRecordKeys[selectedTable][idx + 1]);
+        }
+    }
+
+    private async Task OnPkJumpSelected(ChangeEventArgs e)
+    {
+        string? val = e.Value?.ToString();
+        if (string.IsNullOrEmpty(val) || !tableRecordKeys.ContainsKey(selectedTable)) return;
+
+        var target = tableRecordKeys[selectedTable].FirstOrDefault(km => FormatKeyMapLabel(km) == val);
+        if (target != null)
+        {
+            await RequestRecordNavigation(target);
+        }
+    }
+
+    private string FormatKeyMapLabel(Dictionary<string, string> keyMap)
+    {
+        return string.Join(" | ", keyMap.Values);
+    }
+
+    private bool IsMatchingKeys(Dictionary<string, string> a, Dictionary<string, string> b)
+    {
+        if (a.Count != b.Count) return false;
+        foreach (var kvp in a)
+        {
+            if (!b.TryGetValue(kvp.Key, out var val) || val != kvp.Value) return false;
+        }
+        return true;
+    }
+
+    private async Task OnDatabaseChanged(string newPath)
+    {
+        editingRow = null;
+        originalKeys = new Dictionary<string, string>();
+        pendingNavigationTargetKey = null;
+        pendingNavigationTable = null;
+
+        expandedTable = null;
+        selectedTable = null;
+        tableRecordKeys.Clear();
+        columnMetadata.Clear();
+
+        isLoadingTables = true;
+        StateHasChanged();
+
+        try
+        {
+            dbPath = newPath;
+            dbObjects = await DbService.GetTablesAndViewsAsync();
+
+            var firstTable = dbObjects.FirstOrDefault(o => o.Type == "table") ?? dbObjects.FirstOrDefault();
+            if (firstTable != null)
+            {
+                selectedTable = firstTable.Name;
+                expandedTable = firstTable.Name;
+                await SelectTable(firstTable.Name);
+
+                if (tableRecordKeys.ContainsKey(firstTable.Name) && tableRecordKeys[firstTable.Name].Any())
+                {
+                    var firstRecordKey = tableRecordKeys[firstTable.Name].First();
+                    await ExecuteNavigationForTable(firstTable.Name, firstRecordKey);
+                }
+            }
+        }
+        finally
+        {
+            isLoadingTables = false;
+            StateHasChanged();
+        }
+    }
+}

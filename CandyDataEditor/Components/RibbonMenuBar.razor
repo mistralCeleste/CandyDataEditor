@@ -9,7 +9,7 @@
 
         <!-- FILE MENU -->
         <div class="dropdown position-relative">
-            <button class="btn btn-sm @(openMenu == "file" ? "btn-secondary" : "btn-light") fw-bold"
+            <button class="btn btn-sm @(openMenu == "file" ? "btn-secondary" : "btn-outline-secondary") fw-bold"
                     type="button"
                     @onclick='() => ToggleMenu("file")'>
                 📁 File
@@ -42,7 +42,7 @@
 
         <!-- SETTINGS MENU -->
         <div class="dropdown position-relative">
-            <button class="btn btn-sm @(openMenu == "settings" ? "btn-secondary" : "btn-light") fw-bold"
+            <button class="btn btn-sm @(openMenu == "settings" ? "btn-secondary" : "btn-outline-secondary") fw-bold"
                     type="button"
                     @onclick='() => ToggleMenu("settings")'>
                 ⚙️ Settings
@@ -59,7 +59,7 @@
 
         <!-- EXPORT MENU -->
         <div class="dropdown position-relative">
-            <button class="btn btn-sm @(openMenu == "export" ? "btn-secondary" : "btn-light") fw-bold"
+            <button class="btn btn-sm @(openMenu == "export" ? "btn-secondary" : "btn-outline-secondary") fw-bold"
                     type="button"
                     @onclick='() => ToggleMenu("export")'>
                 📤 Export
@@ -182,7 +182,7 @@
                             <div class="mb-3 mt-2">
                                 <label class="form-label small fw-bold">Theme Mode</label>
                                 <div class="btn-group w-100">
-                                    <button class="btn btn-outline-dark @(!isDarkMode ? "active" : "")" @onclick="() => ToggleTheme(false)">☀️ Light Mode</button>
+                                    <button class="btn btn-outline-light @(!isDarkMode ? "active" : "")" @onclick="() => ToggleTheme(false)">☀️ Light Mode</button>
                                     <button class="btn btn-outline-dark @(isDarkMode ? "active" : "")" @onclick="() => ToggleTheme(true)">🌙 Dark Mode</button>
                                 </div>
                             </div>

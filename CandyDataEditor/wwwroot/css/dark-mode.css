@@ -1,13 +1,26 @@
 /* ==========================================================================
+   LIGHT MODE DEFAULTS (Explicit Root Variables)
+   ========================================================================== */
+:root {
+    --bs-body-rgb: 255, 255, 255;
+    --bs-body-bg-rgb: 255, 255, 255;
+    --bs-body-secondary-rgb: 248, 249, 250;
+    --bs-body-tertiary-rgb: 233, 236, 239;
+}
+
+/* ==========================================================================
    DARK MODE OVERRIDES
    Supports either data-bs-theme="dark" on <html>/<body> or .dark-mode class
    ========================================================================== */
-
 [data-bs-theme="dark"],
 body.dark-mode {
-    /* 1. Global Bootstrap Variables Override */
+    /* 1. Global Color Variables Override */
     --bs-body-color: #dee2e6;
     --bs-body-bg: #121212;
+    --bs-body-rgb: 18, 18, 18; /* Fixes .bg-body in dark mode */
+    --bs-body-bg-rgb: 18, 18, 18;
+    --bs-body-secondary-rgb: 30, 30, 30;
+    --bs-body-tertiary-rgb: 42, 42, 42;
     --bs-gray-100: #1e1e1e;
     --bs-gray-200: #2a2a2a;
     --bs-gray-300: #3a3a3a;
@@ -15,7 +28,7 @@ body.dark-mode {
     --bs-gray-900: #f8f9fa;
     --bs-primary: #3d8bfd;
     --bs-border-color: #333333;
-    /* Base Page Styling */
+    /* Base Page Styling for Body */
     background-color: var(--bs-body-bg) !important;
     color: var(--bs-body-color) !important;
 }
@@ -32,7 +45,28 @@ body.dark-mode {
         }
 
     /* ==========================================================================
-   2. Bootstrap Components (Cards, Modals, Forms, Tables, Accordions)
+   DYNAMIC BACKGROUND UTILITIES
+   ========================================================================== */
+    [data-bs-theme="dark"] .bg-body,
+    body.dark-mode .bg-body {
+        background-color: rgb(var(--bs-body-rgb)) !important;
+        color: var(--bs-body-color) !important;
+    }
+
+    [data-bs-theme="dark"] .bg-body-secondary,
+    body.dark-mode .bg-body-secondary {
+        background-color: rgb(var(--bs-body-secondary-rgb)) !important;
+        color: var(--bs-body-color) !important;
+    }
+
+    [data-bs-theme="dark"] .bg-body-tertiary,
+    body.dark-mode .bg-body-tertiary {
+        background-color: rgb(var(--bs-body-tertiary-rgb)) !important;
+        color: var(--bs-body-color) !important;
+    }
+
+    /* ==========================================================================
+   BOOTSTRAP COMPONENTS
    ========================================================================== */
 
     /* Cards & Headers */
@@ -150,9 +184,8 @@ body.dark-mode {
     }
 
     /* ==========================================================================
-   3. TipTap Editor Dark Mode Variable Overrides
+   TIPTAP EDITOR DARK MODE OVERRIDES
    ========================================================================== */
-
     [data-bs-theme="dark"] .ttp-editor-wrapper,
     body.dark-mode .ttp-editor-wrapper {
         --ttp-primary: #64b5f6;
@@ -189,7 +222,7 @@ body.dark-mode {
     [data-bs-theme="dark"] .tiptap-container .game-icon-ligature,
     body.dark-mode .game-icon-ligature,
     body.dark-mode .tiptap-container .game-icon-ligature {
-        color: #64b5f6; /* Soft blue glow for dark icons */
+        color: #64b5f6;
     }
 
     [data-bs-theme="dark"] .tiptap-container .action-menu-parent,
@@ -216,3 +249,47 @@ body.dark-mode {
         background: #332b00;
         color: #fff2a8;
     }
+
+    /* ==========================================================================
+   THEME-AWARE BUTTON OVERRIDES
+   ========================================================================== */
+
+    /* Invert btn-light in Dark Mode */
+    [data-bs-theme="dark"] .btn-light,
+    body.dark-mode .btn-light {
+        background-color: #2b2b2b !important;
+        border-color: #444444 !important;
+        color: #e0e0e0 !important;
+    }
+
+        [data-bs-theme="dark"] .btn-light:hover:not(:disabled),
+        [data-bs-theme="dark"] .btn-light:focus,
+        body.dark-mode .btn-light:hover:not(:disabled),
+        body.dark-mode .btn-light:focus {
+            background-color: #383838 !important;
+            border-color: #555555 !important;
+            color: #ffffff !important;
+        }
+
+        [data-bs-theme="dark"] .btn-light:disabled,
+        body.dark-mode .btn-light:disabled {
+            background-color: #1e1e1e !important;
+            border-color: #333333 !important;
+            color: #6c757d !important;
+            opacity: 0.6;
+        }
+
+    /* Invert btn-dark in Dark Mode */
+    [data-bs-theme="dark"] .btn-dark,
+    body.dark-mode .btn-dark {
+        background-color: #e0e0e0 !important;
+        border-color: #cccccc !important;
+        color: #121212 !important;
+    }
+
+        [data-bs-theme="dark"] .btn-dark:hover:not(:disabled),
+        body.dark-mode .btn-dark:hover:not(:disabled) {
+            background-color: #ffffff !important;
+            border-color: #ffffff !important;
+            color: #000000 !important;
+        }

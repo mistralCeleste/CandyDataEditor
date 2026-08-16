@@ -73,12 +73,41 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper) {
 
     // Attach Right-Click Context Menu Listener ...
     container.addEventListener('contextmenu', (event) => {
-        // ... (keep your existing contextmenu code here) ...
+        const target = event.target.closest('.custom-misspelled-word');
+        if (target) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const word = target.innerText.trim();
+            const rect = container.getBoundingClientRect();
+
+            // Calculate relative offset inside wrapper
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+
+            const editor = window.tiptapInstances[elementId];
+            if (editor && editor.view) {
+                // Find exact DOM position of the misspelled span inside ProseMirror
+                const pos = editor.view.posAtDOM(target, 0);
+
+                if (pos !== null && pos !== undefined) {
+                    const from = pos;
+                    const to = pos + word.length;
+
+                    dotnetHelper.invokeMethodAsync('OpenSpellcheckContextMenu',
+                        word, from, to, clickX, clickY);
+                }
+            }
+        }
     });
 
     // Close context menu on outside click ...
     window.addEventListener('click', (event) => {
-        // ... (keep your existing click code here) ...
+        // If the click is outside any open spellcheck menu, tell Blazor to close it
+        if (!event.target.closest('.spellcheck-context-menu')) {
+            dotnetHelper.invokeMethodAsync('CloseSpellcheckContextMenu');
+        }
     });
 
     const editor = new window.TipTap.Editor({
