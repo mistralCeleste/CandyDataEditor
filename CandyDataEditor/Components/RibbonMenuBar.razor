@@ -215,12 +215,15 @@
                     {
                         <div class="p-2">
                             <!-- HEADER & DIRECTORY ACTION -->
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div>
-                                    <h6 class="mb-0">📖 Loaded Dictionaries & Vocabulary</h6>
-                                    <small class="text-muted">Directory: <code>@dictDirectoryPath</code></small>
+                            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+                                <div class="overflow-hidden">
+                                    <h6 class="mb-1">📖 Loaded Dictionaries & Vocabulary</h6>
+                                    <div class="text-muted small text-break p-2 bg-body-tertiary font-monospace">
+                                        <strong>Directory:</strong> <code>@dictDirectoryPath</code>
+                                    </div>
                                 </div>
-                                <button class="btn btn-sm btn-outline-primary" @onclick="OpenDictionaryDirectoryInExplorer">
+                                <button class="btn btn-sm btn-outline-primary align-self-start align-self-sm-center flex-shrink-0"
+                                        @onclick="OpenDictionaryDirectoryInExplorer">
                                     📂 Open Folder in Explorer
                                 </button>
                             </div>
@@ -469,7 +472,8 @@
 
     private async Task RefreshDictionaryState()
     {
-        dictDirectoryPath = DictionaryService.GetBundledDictionariesDirectory();
+        // Point to the active, writeable AppData dictionaries folder
+        dictDirectoryPath = DictionaryService.GetLocalDictionariesFolder();
         activeDictionaryWords = await DictionaryService.SyncAndLoadAllDictionariesAsync();
 
         loadedDictFiles.Clear();
@@ -547,7 +551,8 @@
     {
         if (string.IsNullOrWhiteSpace(word)) return;
 
-        await DictionaryService.RemoveWordFromDictionaryFileAsync("custom_user_words.txt", word);
+        // Removes from ALL .txt files in AppData (including english_base.txt)
+        await DictionaryService.RemoveWordFromAllDictionariesAsync(word);
         await RefreshDictionaryState();
     }
 }

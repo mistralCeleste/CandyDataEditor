@@ -126,6 +126,10 @@ body.dark-mode {
         border-color: #333;
     }
 
+    [data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) {
+        color: var(--bs-body-color)
+    }
+
     /* List Groups / Accordions */
     [data-bs-theme="dark"] .list-group-item,
     body.dark-mode .list-group-item {

@@ -32211,7 +32211,7 @@ ${element.innerHTML}
 
   // tiptap-entry.js
   var Markdown2 = Markdown || void 0 || tiptap_markdown_es_exports;
-  window.DEBUG_SPELLCHECK = false;
+  window.DEBUG_SPELLCHECK = true;
   var LIGATURE_REGEX = /\[[a-zA-Z0-9_-]+\]|->|<-|--/g;
   var WORD_REGEX = /[\p{L}0-9_']+/gu;
   var NativeCustomSpellchecker = Extension.create({
@@ -32221,16 +32221,14 @@ ${element.innerHTML}
         new Plugin({
           key: new PluginKey("nativeCustomSpellchecker"),
           props: {
+            // In tiptap-entry.js inside NativeCustomSpellchecker:
             decorations(state) {
               debugLog("\u{1F50D} [Spellchecker Plugin] Running decorations pass...");
               const spellchecker = window.spellchecker;
-              let allowed = window.activeGameWords;
-              if ((!allowed || allowed.size === 0) && spellchecker) {
-                allowed = spellchecker.words || spellchecker.globalGameWords;
-              }
-              const allowedSize = allowed ? allowed.size || allowed.length || 0 : 0;
+              let allowedSet = spellchecker && spellchecker.globalGameWords instanceof Set ? spellchecker.globalGameWords : window.activeGameWords;
+              const allowedSize = allowedSet ? allowedSet.size : 0;
               debugLog(`\u{1F4E6} [Spellchecker Plugin] Active Dictionary Size: ${allowedSize}`);
-              if (!allowed || allowedSize === 0) {
+              if (!allowedSet || allowedSize === 0) {
                 debugWarn("\u26A0\uFE0F [Spellchecker Plugin] Dictionary is empty or missing! Skipping scan.");
                 return DecorationSet.empty;
               }
@@ -32260,8 +32258,8 @@ ${element.innerHTML}
                   );
                   if (isInsideLigature) continue;
                   wordsScanned++;
-                  const lower = word.toLowerCase().trim();
-                  const isKnown = allowed.has ? allowed.has(lower) : allowed.includes(lower);
+                  const lower = word.replace(/[\u200B-\u200D\uFEFF]/g, "").toLowerCase().trim();
+                  const isKnown = allowedSet.has(lower);
                   if (!isKnown) {
                     misspellingsFound++;
                     debugLog(`\u274C [Misspelled Word Flagged]: "${word}" (Normalized: "${lower}")`);

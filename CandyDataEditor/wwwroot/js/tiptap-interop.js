@@ -18,11 +18,11 @@ window.setGlobalGameDictionary = (wordList) => {
     }
     window.activeGameWords = normalizedSet;
 
+    // Force ProseMirror plugin re-decoration pass on all active editor instances
     if (window.tiptapInstances) {
         Object.values(window.tiptapInstances).forEach(editor => {
             if (editor && editor.view) {
-                // Dispatch a dummy transaction to refresh plugin decoration state
-                const tr = editor.state.tr.setTime(Date.now());
+                const tr = editor.state.tr.setMeta('spellcheckRefresh', Date.now());
                 editor.view.dispatch(tr);
             }
         });

@@ -9,7 +9,7 @@ import * as TipTapMarkdown from 'tiptap-markdown';
 const Markdown = TipTapMarkdown.Markdown || TipTapMarkdown.default || TipTapMarkdown;
 
 // --- Native ProseMirror Custom Spellchecker ---
-window.DEBUG_SPELLCHECK = false; // Set to false to silence logs in production
+window.DEBUG_SPELLCHECK = true; // Set to false to silence logs in production
 const LIGATURE_REGEX = /\[[a-zA-Z0-9_-]+\]|->|<-|--/g;
 const WORD_REGEX = /[\p{L}0-9_']+/gu;
 
@@ -21,20 +21,20 @@ export const NativeCustomSpellchecker = Extension.create({
             new Plugin({
                 key: new PluginKey('nativeCustomSpellchecker'),
                 props: {
+                    // In tiptap-entry.js inside NativeCustomSpellchecker:
                     decorations(state) {
                         debugLog("🔍 [Spellchecker Plugin] Running decorations pass...");
 
                         const spellchecker = window.spellchecker;
-                        let allowed = window.activeGameWords;
+                        // Prefer window.spellchecker.globalGameWords (the Set) directly
+                        let allowedSet = (spellchecker && spellchecker.globalGameWords instanceof Set)
+                            ? spellchecker.globalGameWords
+                            : window.activeGameWords;
 
-                        if ((!allowed || allowed.size === 0) && spellchecker) {
-                            allowed = spellchecker.words || spellchecker.globalGameWords;
-                        }
-
-                        const allowedSize = allowed ? (allowed.size || allowed.length || 0) : 0;
+                        const allowedSize = allowedSet ? allowedSet.size : 0;
                         debugLog(`📦 [Spellchecker Plugin] Active Dictionary Size: ${allowedSize}`);
 
-                        if (!allowed || allowedSize === 0) {
+                        if (!allowedSet || allowedSize === 0) {
                             debugWarn("⚠️ [Spellchecker Plugin] Dictionary is empty or missing! Skipping scan.");
                             return DecorationSet.empty;
                         }
@@ -66,6 +66,7 @@ export const NativeCustomSpellchecker = Extension.create({
                                 const wordStart = match.index;
                                 const wordEnd = wordStart + word.length;
 
+                                // Flag all words > 1 char that aren't numbers
                                 if (word.length <= 1 || !isNaN(word)) continue;
 
                                 const isInsideLigature = ligatureRanges.some(
@@ -74,9 +75,12 @@ export const NativeCustomSpellchecker = Extension.create({
                                 if (isInsideLigature) continue;
 
                                 wordsScanned++;
-                                const lower = word.toLowerCase().trim();
 
-                                const isKnown = allowed.has ? allowed.has(lower) : allowed.includes(lower);
+                                // Clean control characters and normalize
+                                const lower = word.replace(/[\u200B-\u200D\uFEFF]/g, '').toLowerCase().trim();
+
+                                // Direct O(1) Set check
+                                const isKnown = allowedSet.has(lower);
 
                                 if (!isKnown) {
                                     misspellingsFound++;

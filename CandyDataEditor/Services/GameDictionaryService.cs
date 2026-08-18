@@ -15,7 +15,7 @@ public class GameDictionaryService
     }
 
     /// <summary>
-    /// Gets the physical disk path to the wwwroot/dictionaries folder.
+    /// Gets the physical disk path to the wwwroot/dictionaries folder in the app package.
     /// </summary>
     public string GetBundledDictionariesDirectory()
     {
@@ -23,7 +23,7 @@ public class GameDictionaryService
     }
 
     /// <summary>
-    /// Gets a safe writeable folder in AppDataDirectory.
+    /// Gets the active writeable dictionaries folder in AppData.
     /// </summary>
     public string GetLocalDictionariesFolder()
     {
@@ -36,11 +36,10 @@ public class GameDictionaryService
     }
 
     /// <summary>
-    /// Asynchronously scans, copies missing bundled dictionaries, and reads all words on a background thread.
+    /// Scans, copies missing bundled dictionaries, and returns all active combined words.
     /// </summary>
     public async Task<List<string>> SyncAndLoadAllDictionariesAsync()
     {
-        // Run file scanning and text parsing off the UI thread
         return await Task.Run(async () =>
         {
             var allWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -70,7 +69,6 @@ public class GameDictionaryService
 
                 foreach (var filePath in allLocalTxtFiles)
                 {
-                    // Asynchronous UTF-8 read
                     var lines = await File.ReadAllLinesAsync(filePath, System.Text.Encoding.UTF8);
 
                     foreach (var line in lines)
@@ -121,44 +119,36 @@ public class GameDictionaryService
         }
     }
 
-    public async Task RemoveWordFromDictionaryFileAsync(string fileName, string wordToRemove)
-    {
-        string filePath = Path.Combine(GetLocalDictionariesFolder(), fileName);
-        if (!File.Exists(filePath)) return;
-
-        var lines = (await File.ReadAllLinesAsync(filePath)).ToList();
-
-        // Case-insensitive removal
-        int removedCount = lines.RemoveAll(l => l.Trim().Equals(wordToRemove.Trim(), StringComparison.OrdinalIgnoreCase));
-
-        if (removedCount > 0)
-        {
-            await File.WriteAllLinesAsync(filePath, lines);
-        }
-    }
-
     /// <summary>
-    /// Seeds default dictionary files from wwwroot into AppData if they don't exist yet.
+    /// Scans ALL active dictionary files in AppData and strips the word wherever it appears.
     /// </summary>
-    public async Task EnsureDefaultDictionariesSeededAsync(params string[] fileNames)
+    public async Task RemoveWordFromAllDictionariesAsync(string wordToRemove)
     {
+        if (string.IsNullOrWhiteSpace(wordToRemove)) return;
+
+        string targetWord = wordToRemove.Trim();
         string localFolder = GetLocalDictionariesFolder();
 
-        foreach (var fileName in fileNames)
+        if (!Directory.Exists(localFolder)) return;
+
+        var dictFiles = Directory.GetFiles(localFolder, "*.txt");
+
+        foreach (var filePath in dictFiles)
         {
-            string targetPath = Path.Combine(localFolder, fileName);
-            if (!File.Exists(targetPath))
+            try
             {
-                try
+                var lines = (await File.ReadAllLinesAsync(filePath, System.Text.Encoding.UTF8)).ToList();
+
+                int removedCount = lines.RemoveAll(l => l.Trim().Equals(targetWord, StringComparison.OrdinalIgnoreCase));
+
+                if (removedCount > 0)
                 {
-                    // Fetch default content from wwwroot/dictionaries/ via HttpClient
-                    var content = await _httpClient.GetStringAsync($"dictionaries/{fileName}");
-                    await File.WriteAllTextAsync(targetPath, content, System.Text.Encoding.UTF8);
+                    await File.WriteAllLinesAsync(filePath, lines, System.Text.Encoding.UTF8);
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Could not seed {fileName}: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error removing word from {filePath}: {ex.Message}");
             }
         }
     }
