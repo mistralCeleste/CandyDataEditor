@@ -1,5 +1,3 @@
----
-
 # 🍬 CandyDataEditor
 
 **CandyDataEditor** is a desktop-grade SQLite database management application built with **C# .NET Blazor** and **Bootstrap 5**.
