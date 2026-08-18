@@ -8,12 +8,9 @@ import * as TipTapMarkdown from 'tiptap-markdown';
 
 const Markdown = TipTapMarkdown.Markdown || TipTapMarkdown.default || TipTapMarkdown;
 
-// Active game words state set from Blazor
-window.activeGameWords = new Set();
-
 // --- Native ProseMirror Custom Spellchecker ---
+window.DEBUG_SPELLCHECK = false; // Set to false to silence logs in production
 const LIGATURE_REGEX = /\[[a-zA-Z0-9_-]+\]|->|<-|--/g;
-// Unicode word regex supporting French accents & English terms
 const WORD_REGEX = /[\p{L}0-9_']+/gu;
 
 export const NativeCustomSpellchecker = Extension.create({
@@ -25,19 +22,31 @@ export const NativeCustomSpellchecker = Extension.create({
                 key: new PluginKey('nativeCustomSpellchecker'),
                 props: {
                     decorations(state) {
-                        const allowed = window.activeGameWords;
-                        if (!allowed || allowed.size === 0) return DecorationSet.empty;
+                        debugLog("🔍 [Spellchecker Plugin] Running decorations pass...");
+
+                        const spellchecker = window.spellchecker;
+                        let allowed = window.activeGameWords;
+
+                        if ((!allowed || allowed.size === 0) && spellchecker) {
+                            allowed = spellchecker.words || spellchecker.globalGameWords;
+                        }
+
+                        const allowedSize = allowed ? (allowed.size || allowed.length || 0) : 0;
+                        debugLog(`📦 [Spellchecker Plugin] Active Dictionary Size: ${allowedSize}`);
+
+                        if (!allowed || allowedSize === 0) {
+                            debugWarn("⚠️ [Spellchecker Plugin] Dictionary is empty or missing! Skipping scan.");
+                            return DecorationSet.empty;
+                        }
 
                         const decorations = [];
-
-                        // ONLY scan text blocks in the current selection / viewport for speed
-                        const { selection } = state;
-                        const parentBlock = selection.$from.node(-1) || state.doc;
+                        let wordsScanned = 0;
+                        let misspellingsFound = 0;
 
                         state.doc.descendants((node, pos) => {
                             if (!node.isText || !node.text) return;
 
-                            // 1. Skip ligatures
+                            // Skip ligatures
                             const ligatureRanges = [];
                             let ligMatch;
                             LIGATURE_REGEX.lastIndex = 0;
@@ -48,7 +57,7 @@ export const NativeCustomSpellchecker = Extension.create({
                                 });
                             }
 
-                            // 2. Scan words
+                            // Scan words
                             WORD_REGEX.lastIndex = 0;
                             let match;
 
@@ -64,17 +73,26 @@ export const NativeCustomSpellchecker = Extension.create({
                                 );
                                 if (isInsideLigature) continue;
 
+                                wordsScanned++;
                                 const lower = word.toLowerCase().trim();
-                                if (!allowed.has(lower)) {
+
+                                const isKnown = allowed.has ? allowed.has(lower) : allowed.includes(lower);
+
+                                if (!isKnown) {
+                                    misspellingsFound++;
+                                    debugLog(`❌ [Misspelled Word Flagged]: "${word}" (Normalized: "${lower}")`);
+
                                     decorations.push(
                                         Decoration.inline(pos + wordStart, pos + wordEnd, {
                                             class: 'custom-misspelled-word',
+                                            'data-misspelled': 'true'
                                         })
                                     );
                                 }
                             }
                         });
 
+                        debugLog(`✅ [Spellchecker Summary] Scanned: ${wordsScanned} words | Misspelled: ${misspellingsFound} | Applied Decorations: ${decorations.length}`);
                         return DecorationSet.create(state.doc, decorations);
                     },
                 },
@@ -449,6 +467,17 @@ export function createEditor(elementId, initialContent, dotnetRef, initialDictio
     return editor;
 }
 
+function debugLog(message, ...args) {
+    if (window.DEBUG_SPELLCHECK) {
+        console.log(message, ...args);
+    }
+}
+
+function debugWarn(message, ...args) {
+    if (window.DEBUG_SPELLCHECK) {
+        console.warn(message, ...args);
+    }
+}
 
 // Register on window.TipTap
 window.TipTap = {

@@ -9,8 +9,12 @@ namespace CandyDataEditor.Services;
 
 public class SqliteDataService
 {
-    private string _dbPath;
+    public event Func<string, Task>? OnDatabasePathChanged;
     public SqliteEditorConfig Config { get; }
+
+    public bool HasActiveDatabase => !string.IsNullOrEmpty(_dbPath);
+
+    private string _dbPath;
 
     public SqliteDataService(SqliteEditorConfig config)
     {
@@ -20,12 +24,38 @@ public class SqliteDataService
     }
 
     public string GetDatabasePath() => _dbPath;
+    public string CurrentDatabasePath => _dbPath;
 
     public void SetDatabasePath(string newPath)
     {
         if (!string.IsNullOrWhiteSpace(newPath))
         {
             _dbPath = newPath;
+            Config.AddRecentDatabase(newPath);
+        }
+    }
+
+    public async Task SetDatabasePathAsync(string path)
+    {
+        _dbPath = path;
+        Config.AddRecentDatabase(path);
+
+        if (OnDatabasePathChanged != null)
+        {
+            await OnDatabasePathChanged.Invoke(path);
+        }
+    }
+
+    /// <summary>
+    /// Closes the currently active database and triggers path change to empty state.
+    /// </summary>
+    public async Task CloseDatabaseAsync()
+    {
+        _dbPath = string.Empty;
+
+        if (OnDatabasePathChanged != null)
+        {
+            await OnDatabasePathChanged.Invoke(string.Empty);
         }
     }
 

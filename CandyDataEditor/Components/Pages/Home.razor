@@ -1,146 +1,167 @@
 ﻿@page "/"
-@using CandyDataEditor.Components
 @using CandyDataEditor.Services
+@implements IDisposable
+@inject SqliteDataService DbService
+@inject NavigationManager NavManager
 @inject GameDictionaryService DictionaryService
 @inject IJSRuntime JSRuntime
 
-<PageTitle>Game Data Editor</PageTitle>
-
-<div class="container my-4">
-    <h2>Game Data Editor</h2>
-    <p class="text-muted">Editing Item Description with TipTap v3 & Markdown</p>
-
-    <div class="card mb-3 bg-light">
-        <div class="card-body d-flex gap-2 align-items-center">
-            <span class="fw-bold">Add Custom Term:</span>
-            <input type="text" class="form-control form-control-sm w-25"
-                   placeholder="e.g. mithril, warblade..."
-                   @bind="newCustomWord" />
-            <button class="btn btn-sm btn-success" @onclick="AddNewWordToDictionary">
-                ➕ Add to Game Dictionary
-            </button>
-            <span class="text-muted ms-auto">
-                <small>(@activeDictionary.Count terms)</small>
-            </span>
+<div class="container-fluid p-4">
+    <!-- Welcome Header -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Candy Data Editor</h2>
+            <p class="text-muted mb-0">Select a dataset from the sidebar to start editing, or pick up where you left off.</p>
         </div>
     </div>
 
-    <!-- 1. TipTap Editor Form Field -->
-    <div class="card mb-4">
-        <div class="card-header font-weight-bold d-flex justify-content-between align-items-center">
-            <span>Item Description</span>
-            <small class="text-muted">Loaded Words: @activeDictionary.Count</small>
+    <!-- Quick Stats & Actions Grid -->
+    <div class="row g-3 mb-4">
+        
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase fw-semibold mb-2">Spellcheck Status</h6>
+                    <div class="d-flex align-items-center justify-content-between mt-3">
+                        <span class="small">Engine: <strong>JS / ProseMirror</strong></span>
+
+                        @if (IsDictionaryLoaded)
+                        {
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle me-1"></i>Ready: @WordCount.ToString("N0") words active
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary text-light">
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                Loading...
+                            </span>
+                        }
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <TipTapEditor @bind-Value="gameItemHtml"
-                          @bind-MarkdownValue="gameItemMarkdown"
-                          GameDictionaryWords="activeDictionary"
-                          OnAddWordRequested="AddWordFromContextMenu" />
+
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase fw-semibold mb-2">Shortcuts</h6>
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-1"><code>Ctrl + S</code> — Save current record</li>
+                        <li class="mb-1"><code>Right-Click Word</code> — Open Spellcheck suggestions</li>
+                        <li><code>Ctrl + Alt + O</code> — Open VS Debug Console</li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- 2. Controls & Actions -->
-    <div class="d-flex gap-2 mb-4">
-        <button class="btn btn-secondary" @onclick="ResetContent">Reset Text</button>
-        <button class="btn btn-outline-primary" @onclick="InsertSampleLore">Insert Game Lore</button>
+    <!-- Recent Databases -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-transparent fw-bold py-3">
+            <i class="bi bi-hdd-network me-2"></i>Recently Opened Databases
+        </div>
+        <div class="card-body p-0">
+            @if (DbService.Config.RecentDatabases.Any())
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var dbPath in DbService.Config.RecentDatabases)
+                    {
+                        bool isCurrentDb = string.Equals(dbPath, DbService.GetDatabasePath(), StringComparison.OrdinalIgnoreCase);
+
+                        <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 @(isCurrentDb ? "bg-light-subtle" : "")"
+                                @onclick="() => OpenDatabase(dbPath)">
+                            <div class="text-truncate me-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-semibold text-primary text-truncate">
+                                        <i class="bi bi-database me-2"></i>@System.IO.Path.GetFileName(dbPath)
+                                    </span>
+
+                                    @if (isCurrentDb)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle fs-7">
+                                            <i class="bi bi-check-circle-fill me-1"></i>Active
+                                        </span>
+                                    }
+                                </div>
+                                <small class="text-muted text-truncate d-block font-monospace fs-7 mt-1">
+                                    @dbPath
+                                </small>
+                            </div>
+                            <i class="bi bi-chevron-right text-muted"></i>
+                        </button>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-database-gear fs-2 d-block mb-2"></i>
+                    No recent databases found. Use <strong>File &rarr; Open</strong> from the ribbon menu to load a database.
+                </div>
+            }
+        </div>
     </div>
 </div>
 
 @code {
-    private string gameItemHtml = string.Empty;
-    private string gameItemMarkdown = @"# Setup
-~ [place] MAP-001
-~ [mob] FOE-003, [brute] FOE-004, [elite] FOE-005
+    private bool IsDictionaryLoaded = false;
+    private int WordCount = 0;
+    private List<RecentRecordItem> RecentRecords = new();
 
-Enemies in the ==Whirlpool Abyss== have *defense* [defense] and reactions [warning] on their **hp-grids**.
-
-When an hp-grid has a [defense], place a foe marker over the grid. It takes two hits to wound the slot--the first hit removes the foe marker, the second to wound it.
-
-Reaction slots have [warning] on the hp-grid. Immediately after wounding a [warning] slot and before your damage pattern continues, resolve the [warning] reaction on the foe’s FAI card. If this takes the foe out of range, combat, or reduces your health to zero, your pattern stops; otherwise, you may continue to wound the foe afterwards.
-
-# Actions
-@ Wreckage
-Beastfolk **scavengers** prowl the wreck, prying apart broken timbers, their eyes gleaming with ruthless opportunity.
-
-@@ Scavengers
-Beastfolk scavengers swarm the wreckage strewn about the rockface. Clawed hands pry open shattered crates, eyes gleaming with treasure lust. Some growl disputes over spoils, while others sniff the winds for danger.
-
-@ Whirlpool
-Held aloft by reef spires in the center of the whirlpool is the shattered **Iserian ship**, its splintered hull being thrashed by whirlpool’s pull.
-
-@@ Iserian Ship
-The Moonlit Pearl, an Iserian ship, lies wrecked upon the jagged reef spires. Its ornate hull, once gleaming with silver runes, are now splintered. Torn sails drift like ghosts, battered by the whirlpool’s blustery breeze. [openbook] to EVT-004.
-
-# Triggers
-@ A
-From the bluff, the world seems to fall away beneath your feet. The wind whipping past as the roar of the Whirlpool Abyss rises to meet you. The path descends in a steep, switchbacking cut of stone and sand, each step revealing more of the churning blue waters below
-
-By the time you reach the beach, the air is thick with mist and the ground trembles with the slow, tidal pull of the great vortex waiting just offshore.
-
-@ B
-The beach below the bluff feels like the world’s forgotten dumping ground, a crescent of pale sand choked with shattered planks, torn sails, and the twisted ribs of long‑dead ships. At one end, a massive stone overhang juts out like a jagged jaw, casting a permanent shadow where the surf hisses and retreats.
-
-Beast‑folk scavengers pick through the wreckage by lifting crates, prying open barrels, and muttering to each other as they hunt for anything the Abyss hasn’t already claimed.
-
-@ C
-The Moonlit Pearl hangs helplessly between sea and sky, her hull wedged against the jagged black spires that thrust up from the churning Whirlpool Abyss. The great vortex twists below her, tugging at her keel with a hungry, spiraling pull, while her torn sails drift and snap like pale ghosts in the blustery wind.
-
-@ 503
-Two blocks and two symbols are shown in the room. Solve the puzzle to determine which symbol to cover with a block.
-
-[retrieve] PUZ-001A ([return] when solved)
-
-@ 504
-There is a star symbol, faintly glowing. Solve to unlock its secret.
-
-[retrieve] PUZ-003A ([return] when solved)
-
-@ 505
-Two barriers and two symbols. Solve the puzzle to determine which symbol to cover with a block.
-
-[retrieve] PUZ-002A ([return] when solved)";
-    private List<string> activeDictionary = new();
-    private string newCustomWord = string.Empty;
-    private bool isDictionaryLoaded = false;
-    private bool isLoadingDictionary = true;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender && !isDictionaryLoaded)
+        DictionaryService.OnDictionaryLoaded += HandleDictionaryLoaded;
+        DbService.OnDatabasePathChanged += HandleDatabasePathChanged;
+
+        if (DictionaryService.WordCount > 0)
         {
-            isDictionaryLoaded = true;
-            activeDictionary = await DictionaryService.SyncAndLoadAllDictionariesAsync();
-            isLoadingDictionary = false;
+            WordCount = DictionaryService.WordCount;
+            IsDictionaryLoaded = true;
+        }
+    }
+
+    private void HandleDictionaryLoaded(List<string> wordList)
+    {
+        InvokeAsync(() =>
+        {
+            WordCount = DictionaryService.WordCount;
+            IsDictionaryLoaded = WordCount > 0;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OpenDatabase(string path)
+    {
+        if (System.IO.File.Exists(path))
+        {
+            await DbService.SetDatabasePathAsync(path);
+        }
+        else
+        {
+            DbService.Config.RemoveRecentDatabase(path);
             StateHasChanged();
         }
     }
 
-    private async Task AddNewWordToDictionary()
+    private Task HandleDatabasePathChanged(string newPath)
     {
-        if (string.IsNullOrWhiteSpace(newCustomWord)) return;
-
-        await AddWordFromContextMenu(newCustomWord.Trim());
-        newCustomWord = string.Empty;
+        return InvokeAsync(StateHasChanged);
     }
 
-    private async Task AddWordFromContextMenu(string wordToAdd)
+    public void Dispose()
     {
-        // Appends new custom words into custom_user_terms.txt in AppData
-        await DictionaryService.AddWordToDictionaryFileAsync("custom_user_terms.txt", wordToAdd);
-
-        if (!activeDictionary.Contains(wordToAdd, StringComparer.OrdinalIgnoreCase))
-        {
-            activeDictionary = new List<string>(activeDictionary) { wordToAdd };
-        }
+        DictionaryService.OnDictionaryLoaded -= HandleDictionaryLoaded;
+        DbService.OnDatabasePathChanged -= HandleDatabasePathChanged;
     }
 
-    private void ResetContent()
+    public class RecentRecordItem
     {
-        gameItemMarkdown = "Default game item description...";
-    }
-
-    private void InsertSampleLore()
-    {
-        gameItemMarkdown = "### Excalibur\nForged in ancient times, this [weapon] inflicts **100 holy damage** against ==undead==.";
+        public string TableId { get; set; }
+        public string TableName { get; set; }
+        public string RecordId { get; set; }
+        public string RecordName { get; set; }
+        public DateTime LastEdited { get; set; }
     }
 }

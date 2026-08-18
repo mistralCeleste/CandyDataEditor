@@ -3,7 +3,11 @@ namespace CandyDataEditor.Services;
 
 public class GameDictionaryService
 {
+    public event Action<List<string>>? OnDictionaryLoaded;
+
     private readonly HttpClient _httpClient;
+
+    public int WordCount;
 
     public GameDictionaryService(HttpClient httpClient)
     {
@@ -46,7 +50,6 @@ public class GameDictionaryService
                 string bundledDir = GetBundledDictionariesDirectory();
                 string localDir = GetLocalDictionariesFolder();
 
-                // 1. Sync bundled wwwroot files to AppData if missing
                 if (Directory.Exists(bundledDir))
                 {
                     var bundledTxtFiles = Directory.GetFiles(bundledDir, "*.txt");
@@ -63,7 +66,6 @@ public class GameDictionaryService
                     }
                 }
 
-                // 2. Read all .txt files from AppData concurrently/asynchronously
                 var allLocalTxtFiles = Directory.GetFiles(localDir, "*.txt");
 
                 foreach (var filePath in allLocalTxtFiles)
@@ -86,7 +88,10 @@ public class GameDictionaryService
                 System.Diagnostics.Debug.WriteLine($"Async Dictionary Load Error: {ex.Message}");
             }
 
-            return allWords.ToList();
+            var wordList = allWords.ToList();
+            WordCount = wordList.Count;
+            RaiseOnDictionaryLoaded(wordList);
+            return wordList;
         });
     }
 
@@ -116,6 +121,22 @@ public class GameDictionaryService
         }
     }
 
+    public async Task RemoveWordFromDictionaryFileAsync(string fileName, string wordToRemove)
+    {
+        string filePath = Path.Combine(GetLocalDictionariesFolder(), fileName);
+        if (!File.Exists(filePath)) return;
+
+        var lines = (await File.ReadAllLinesAsync(filePath)).ToList();
+
+        // Case-insensitive removal
+        int removedCount = lines.RemoveAll(l => l.Trim().Equals(wordToRemove.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        if (removedCount > 0)
+        {
+            await File.WriteAllLinesAsync(filePath, lines);
+        }
+    }
+
     /// <summary>
     /// Seeds default dictionary files from wwwroot into AppData if they don't exist yet.
     /// </summary>
@@ -142,12 +163,8 @@ public class GameDictionaryService
         }
     }
 
-    private List<string> ParseWords(IEnumerable<string> rawLines)
+    public void RaiseOnDictionaryLoaded(List<string> wordList)
     {
-        return rawLines
-            .Select(w => w.Trim())
-            .Where(w => !string.IsNullOrWhiteSpace(w) && !w.StartsWith("#"))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        OnDictionaryLoaded?.Invoke(wordList);
     }
 }

@@ -227,8 +227,25 @@ h1:focus {
     box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
 }
 
-.custom-misspelled-word {
-    text-decoration: underline wavy #dc3545 !important;
-    text-decoration-color: #dc3545 !important;
-    text-underline-offset: 3px !important;
+.icon-card:hover {
+    background-color: #e9ecef !important;
+    border-color: #0d6efd !important;
 }
+
+.tiptap-wrapper {
+    background-color: transparent; /* #f8f9fa; */
+}
+
+    .tiptap-wrapper:focus-within {
+        background-color: #f0f7ff; /* Subtle blue tint */
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+.custom-misspelled-word,
+[data-misspelled="true"] {
+    text-decoration: underline red wavy !important;
+    text-decoration-thickness: 1.5px !important;
+    text-underline-offset: 3px !important;
+    cursor: pointer;
+}
+

@@ -2,6 +2,7 @@
 @page "/editor/{TableName}"
 @using System.Web
 @using CandyDataEditor.Services
+@inject IJSRuntime JSRuntime
 @inject SqliteDataService DbService
 @inject NavigationManager NavManager
 
@@ -17,166 +18,165 @@
         <div class="col-md-9">
             @if (editingRow == null)
             {
-                <!-- TABLE GRID VIEW -->
-                <div class="card shadow-sm">
-                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                        <span class="fw-bold">Table: @selectedTable</span>
-                        <div class="d-flex align-items-center gap-2">
-                            @if (tableData != null)
+                    <!-- TABLE GRID VIEW -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Table: @selectedTable</span>
+                            <div class="d-flex align-items-center gap-2">
+                                @if (tableData != null)
+                                {
+                                        <small class="text-muted me-2">Total Rows: <strong>@tableData.Rows.Count</strong></small>
+                                }
+                                <button class="btn btn-sm btn-success" @onclick="CreateNewRecord">➕ New Record</button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            @if (isLoadingData)
                             {
-                                <small class="text-muted me-2">Total Rows: <strong>@tableData.Rows.Count</strong></small>
+                                    <div class="p-4 text-center text-muted">Loading data...</div>
                             }
-                            <button class="btn btn-sm btn-success" @onclick="CreateNewRecord">➕ New Record</button>
+                            else if (tableData != null && tableData.Columns.Any())
+                            {
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-striped table-bordered mb-0 align-middle">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    @foreach (var col in tableData.Columns)
+                                                    {
+                                                            <th>@col</th>
+                                                    }
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var row in tableData.Rows)
+                                                {
+                                                        <tr style="cursor: pointer;" @onclick="() => OpenRecordEditor(row)">
+                                                            @foreach (var col in tableData.Columns)
+                                                            {
+                                                                    <td class="text-truncate" style="max-width: 200px;" title="@row[col]">
+                                                                        @row[col]
+                                                                    </td>
+                                                            }
+                                                        </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            }
                         </div>
                     </div>
-                    <div class="card-body p-0">
-                        @if (isLoadingData)
-                        {
-                            <div class="p-4 text-center text-muted">Loading data...</div>
-                        }
-                        else if (tableData != null && tableData.Columns.Any())
-                        {
-                            <div class="table-responsive">
-                                <table class="table table-hover table-striped table-bordered mb-0 align-middle">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            @foreach (var col in tableData.Columns)
-                                            {
-                                                <th>@col</th>
-                                            }
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var row in tableData.Rows)
-                                        {
-                                            <tr style="cursor: pointer;" @onclick="() => OpenRecordEditor(row)">
-                                                @foreach (var col in tableData.Columns)
-                                                {
-                                                    <td class="text-truncate" style="max-width: 200px;" title="@row[col]">
-                                                        @row[col]
-                                                    </td>
-                                                }
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        }
-                    </div>
-                </div>
             }
             else
             {
-                <!-- VERTICAL RECORD EDITOR VIEW -->
-                <div class="card shadow-sm mb-4" @key='@($"{selectedTable}_{FormatKeyMapLabel(originalKeys)}")'>
-                    <!-- STICKY OPERATIONS HEADER BAR -->
-                    <div class="card-header bg-primary text-white sticky-top shadow-sm py-2" style="z-index: 1020;">
-                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="fw-bold me-2">Record: @selectedTable</span>
+                    <!-- VERTICAL RECORD EDITOR VIEW -->
+                    <div class="card shadow-sm mb-4" @key='@($"{selectedTable}_{FormatKeyMapLabel(originalKeys)}")'>
+                        <!-- STICKY OPERATIONS HEADER BAR -->
+                        <div class="card-header bg-primary text-white sticky-top shadow-sm py-2" style="z-index: 1020;">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-bold me-2">Record: @selectedTable</span>
 
-                                <!-- Prev / Next Record Buttons -->
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-secondary" title="Previous Record" @onclick="NavigateToPreviousRecord" disabled="@(!HasPreviousRecord)">◀ Prev</button>
-                                    <button class="btn btn-outline-secondary" title="Next Record" @onclick="NavigateToNextRecord" disabled="@(!HasNextRecord)">Next ▶</button>
+                                    <!-- Prev / Next Record Buttons -->
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-light" title="Previous Record" @onclick="NavigateToPreviousRecord" disabled="@(!HasPreviousRecord)">◀ Prev</button>
+                                        <button class="btn btn-outline-light" title="Next Record" @onclick="NavigateToNextRecord" disabled="@(!HasNextRecord)">Next ▶</button>
+                                    </div>
+
+                                    <!-- Direct Primary Key Jump Selector -->
+                                    @if (tableRecordKeys.ContainsKey(selectedTable) && tableRecordKeys[selectedTable].Any())
+                                    {
+                                            <select class="form-select form-select-sm w-auto" @onchange="OnPkJumpSelected">
+                                                @foreach (var km in tableRecordKeys[selectedTable])
+                                                {
+                                                        string l = FormatKeyMapLabel(km);
+                                                        bool isSel = IsMatchingKeys(km, originalKeys);
+                                                        <option value="@l" selected="@isSel">@l</option>
+                                                }
+                                            </select>
+                                    }
                                 </div>
 
-                                <!-- Direct Primary Key Jump Selector -->
-                                @if (tableRecordKeys.ContainsKey(selectedTable) && tableRecordKeys[selectedTable].Any())
-                                {
-                                    <select class="form-select form-select-sm w-auto" @onchange="OnPkJumpSelected">
-                                        @foreach (var km in tableRecordKeys[selectedTable])
-                                        {
-                                            string l = FormatKeyMapLabel(km);
-                                            bool isSel = IsMatchingKeys(km, originalKeys);
-                                            <option value="@l" selected="@isSel">@l</option>
-                                        }
-                                    </select>
-                                }
-                            </div>
-
-                            <div class="d-flex align-items-center gap-2">
-                                <!-- Auto-Save Toggle -->
-                                <div class="form-check form-switch me-2 text-white">
-                                    <input class="form-check-input" type="checkbox" id="autoSaveToggle" @bind="autoSaveEnabled" />
-                                    <label class="form-check-label small fw-bold" for="autoSaveToggle">
-                                        Auto-Save: @(autoSaveEnabled ? "ON" : "OFF")
-                                    </label>
-                                </div>
-
-                                <button class="btn btn-sm btn-success" @onclick="SaveCurrentRecord">💾 Save</button>
-                                <button class="btn btn-sm btn-info text-white" @onclick="CloneCurrentRecord">📋 Clone</button>
-                                <button class="btn btn-sm btn-danger" @onclick="DeleteCurrentRecord">🗑️ Delete</button>
-                                <button class="btn btn-sm btn-outline-light" @onclick="CloseRecordEditor">❌ Back</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Global Save Error Banner -->
-                    @if (!string.IsNullOrEmpty(saveErrorMessage))
-                    {
-                        <div class="alert alert-danger m-3 mb-0" role="alert">
-                            <strong>⚠️ Error:</strong> @saveErrorMessage
-                        </div>
-                    }
-
-                    <!-- MAIN FIELDS LIST -->
-                    <div class="card-body">
-                        @if (tableData != null)
-                        {
-                            <div class="d-flex flex-column gap-3">
-                                @foreach (var col in tableData.Columns)
-                                {
-                                    var meta = columnMetadata.TryGetValue(col, out var m) ? m : new ColumnMetadata();
-                                    string fieldValue = GetFieldValue(col);
-                                    int lineCount = DbService.Config.GetLineCountForText(fieldValue);
-                                    string fieldHeightStyle = $"min-height: {lineCount * 1.6}rem;";
-
-                                    <div class="border rounded p-3 @(meta.IsReadOnly || meta.IsGenerated ? "bg-light" : "bg-light")">
-                                        <label class="form-label fw-bold d-flex justify-content-between align-items-center">
-                                            <span>@col</span>
-                                            <div>
-                                                @if (meta.IsPrimaryKey)
-                                                {
-                                                    <span class="badge bg-primary me-1">Primary Key</span>
-                                                }
-                                                @if (meta.IsGenerated)
-                                                {
-                                                    <span class="badge bg-secondary me-1">Generated Field</span>
-                                                }
-                                                @if (meta.IsReadOnly && !meta.IsGenerated)
-                                                {
-                                                    <span class="badge bg-dark me-1">(Read-Only)</span>
-                                                }
-                                            </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <!-- Auto-Save Toggle -->
+                                    <div class="form-check form-switch me-2 text-white">
+                                        <input class="form-check-input" type="checkbox" id="autoSaveToggle" @bind="autoSaveEnabled" />
+                                        <label class="form-check-label small fw-bold" for="autoSaveToggle">
+                                            Auto-Save: @(autoSaveEnabled ? "ON" : "OFF")
                                         </label>
+                                    </div>
 
-                                        @if (meta.IsGenerated || meta.IsReadOnly)
-                                        {
-                                            <input type="text" class="form-control card-body" readonly value="@fieldValue" />
-                                        }
-                                        else
-                                        {
-                                            <div class="card-body border rounded p-2" style="@fieldHeightStyle">
-                                                <TipTapEditor MarkdownValue="@GetFieldValue(col)"
-                                                              MarkdownValueChanged="(val) => SetFieldValue(col, val)"
-                                                              GameDictionaryWords="activeDictionary"
-                                                              OnBlur="OnFieldFocusLost" />
-                                            </div>
-                                        }
+                                    <button class="btn btn-sm btn-success" @onclick="SaveCurrentRecord">💾 Save</button>
+                                    <button class="btn btn-sm btn-info text-white" @onclick="CloneCurrentRecord">📋 Clone</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="DeleteCurrentRecord">🗑️ Delete</button>
+                                    <button class="btn btn-sm btn-outline-light" @onclick="CloseRecordEditor">❌ Back</button>
+                                </div>
+                            </div>
+                        </div>
 
-                                        @if (fieldErrorMessages.TryGetValue(col, out string? fieldError))
+                        <!-- Global Save Error Banner -->
+                        @if (!string.IsNullOrEmpty(saveErrorMessage))
+                        {
+                                <div class="alert alert-danger m-3 mb-0" role="alert">
+                                    <strong>⚠️ Error:</strong> @saveErrorMessage
+                                </div>
+                        }
+
+                        <!-- MAIN FIELDS LIST -->
+                        <div class="card-body">
+                            @if (tableData != null)
+                            {
+                                    <div class="d-flex flex-column gap-3">
+                                        @foreach (var col in tableData.Columns)
                                         {
-                                            <div class="text-danger small mt-1 fw-bold">
-                                                ❌ @fieldError
-                                            </div>
+                                                var meta = columnMetadata.TryGetValue(col, out var m) ? m : new ColumnMetadata();
+                                                string fieldValue = GetFieldValue(col);
+                                                int lineCount = DbService.Config.GetLineCountForText(fieldValue);
+                                                string fieldHeightStyle = $"min-height: {lineCount * 1.6}rem;";
+
+                                                <div @key="col" class="border rounded p-3 @(meta.IsReadOnly || meta.IsGenerated ? "bg-body-tertiary" : "bg-body")">
+                                                    <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                                        <span>@col</span>
+                                                        <div>
+                                                            @if (meta.IsPrimaryKey)
+                                                            {
+                                                                    <span class="badge bg-primary me-1">Primary Key</span>
+                                                            }
+                                                            @if (meta.IsGenerated)
+                                                            {
+                                                                    <span class="badge bg-secondary me-1">Generated Field</span>
+                                                            }
+                                                            @if (meta.IsReadOnly && !meta.IsGenerated)
+                                                            {
+                                                                    <span class="badge bg-dark me-1">(Read-Only)</span>
+                                                            }
+                                                        </div>
+                                                    </label>
+
+                                                    @if (meta.IsGenerated || meta.IsReadOnly)
+                                                    {
+                                                            <input type="text" class="form-control" readonly value="@fieldValue" />
+                                                    }
+                                                    else
+                                                    {
+                                                            <div style="@fieldHeightStyle">
+                                                                <TipTapEditor MarkdownValue="@GetFieldValue(col)"
+                                                                              MarkdownValueChanged="(val) => SetFieldValue(col, val)"
+                                                                              OnBlur="OnFieldFocusLost" />
+                                                            </div>
+                                                    }
+
+                                                    @if (fieldErrorMessages.TryGetValue(col, out string? fieldError))
+                                                    {
+                                                            <div class="text-danger small mt-1 fw-bold">
+                                                                ❌ @fieldError
+                                                            </div>
+                                                    }
+                                                </div>
                                         }
                                     </div>
-                                }
-                            </div>
-                        }
+                            }
+                        </div>
                     </div>
-                </div>
             }
         </div>
     </div>
@@ -185,22 +185,22 @@
 <!-- UNSAVED CHANGES WARNING MODAL -->
 @if (showUnsavedModal)
 {
-    <div class="modal fade show d-block tab-index-1 bg-dark bg-opacity-50" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-warning text-dark">
-                    <h5 class="modal-title fw-bold">⚠️ Unsaved Changes</h5>
-                </div>
-                <div class="modal-body">
-                    You have modified fields in this record without saving. What would you like to do?
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="RevertAndProceed">Discard Changes</button>
-                    <button class="btn btn-primary" @onclick="SaveAndProceed">Save & Continue</button>
+        <div class="modal fade show d-block tab-index-1 bg-dark bg-opacity-50" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title fw-bold">⚠️ Unsaved Changes</h5>
+                    </div>
+                    <div class="modal-body">
+                        You have modified fields in this record without saving. What would you like to do?
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="RevertAndProceed">Discard Changes</button>
+                        <button class="btn btn-primary" @onclick="SaveAndProceed">Save & Continue</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 }
 
 <style>
@@ -233,7 +233,7 @@
     private Dictionary<string, string>? editingRow = null;
     private Dictionary<string, string> originalRowSnapshot = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> originalKeys = new(StringComparer.OrdinalIgnoreCase);
-    private List<string> activeDictionary = new();
+    
     [Parameter] public string? TableName { get; set; }
 
     [SupplyParameterFromQuery]
@@ -269,13 +269,11 @@
     {
         if (string.IsNullOrEmpty(TableName)) return;
 
-        // 1. If table changed, load table schema and record keys
         if (selectedTable != TableName)
         {
             await SelectTable(TableName);
         }
 
-        // 2. Parse primary keys from URL Query Parameters
         var uri = NavManager.ToAbsoluteUri(NavManager.Uri);
         var queryParams = HttpUtility.ParseQueryString(uri.Query);
 
@@ -293,13 +291,11 @@
 
             if (targetKeys.Any())
             {
-                // Load record into vertical editor
                 await ExecuteNavigationForTable(TableName, targetKeys);
             }
         }
         else
         {
-            // No PK in URL: Show full table grid view
             CloseRecordEditor();
         }
     }
@@ -471,8 +467,6 @@
 
             originalKeys = new Dictionary<string, string>(targetKeyMap, StringComparer.OrdinalIgnoreCase);
             editingRow = new Dictionary<string, string>(record, StringComparer.OrdinalIgnoreCase);
-
-            // KEY FIX: Update original baseline snapshot on every navigation
             originalRowSnapshot = new Dictionary<string, string>(record, StringComparer.OrdinalIgnoreCase);
 
             StateHasChanged();
@@ -618,7 +612,6 @@
         await SelectTable(selectedTable);
     }
 
-    // Prev / Next Navigation Helpers
     private bool HasPreviousRecord => GetCurrentRecordIndex() > 0;
     private bool HasNextRecord => tableRecordKeys.ContainsKey(selectedTable) && GetCurrentRecordIndex() < tableRecordKeys[selectedTable].Count - 1;
 
@@ -685,8 +678,8 @@
         pendingNavigationTargetKey = null;
         pendingNavigationTable = null;
 
-        expandedTable = null;
-        selectedTable = null;
+        expandedTable = string.Empty;
+        selectedTable = string.Empty;
         tableRecordKeys.Clear();
         columnMetadata.Clear();
 

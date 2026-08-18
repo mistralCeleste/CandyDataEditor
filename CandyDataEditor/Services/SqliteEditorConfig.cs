@@ -1,5 +1,7 @@
 ﻿// Models/SqliteEditorConfig.cs
+using System.Text.Json;
 using System.Runtime.CompilerServices;
+using Microsoft.Maui.Storage;
 
 namespace CandyDataEditor;
 
@@ -11,6 +13,7 @@ public class SqliteEditorConfig
     private const int DefaultMediumCharThreshold = 150;
     private const int DefaultLargeCharThreshold = 300;
     private const bool DefaultIsDarkMode = false;
+    private const int MaxRecentDatabases = 5;
 
     public SqliteEditorConfig()
     {
@@ -52,6 +55,50 @@ public class SqliteEditorConfig
         set => SetStoredValue(nameof(IsDarkMode), value);
     }
 
+    public List<string> RecentDatabases
+    {
+        get => GetStoredList(nameof(RecentDatabases));
+        private set => SetStoredList(nameof(RecentDatabases), value);
+    }
+
+    /// <summary>
+    /// Adds a database path to the top of the recent list, removes duplicates, and caps at 5 entries.
+    /// </summary>
+    public void AddRecentDatabase(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        var list = RecentDatabases;
+
+        // Case-insensitive removal of existing entry to avoid duplicates
+        list.RemoveAll(p => p.Equals(path, StringComparison.OrdinalIgnoreCase));
+
+        // Insert at the top
+        list.Insert(0, path);
+
+        // Cap to most recent
+        if (list.Count > MaxRecentDatabases)
+        {
+            list = list.Take(MaxRecentDatabases).ToList();
+        }
+
+        RecentDatabases = list;
+    }
+
+    /// <summary>
+    /// Removes a file path if it no longer exists on disk or was deleted.
+    /// </summary>
+    public void RemoveRecentDatabase(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        var list = RecentDatabases;
+        if (list.RemoveAll(p => p.Equals(path, StringComparison.OrdinalIgnoreCase)) > 0)
+        {
+            RecentDatabases = list;
+        }
+    }
+
     /// <summary>
     /// Calculates how many lines of editor height to assign a string based on character thresholds.
     /// </summary>
@@ -87,5 +134,26 @@ public class SqliteEditorConfig
             Preferences.Default.Set(key, boolVal);
         else if (value is string strVal)
             Preferences.Default.Set(key, strVal);
+    }
+
+    private List<string> GetStoredList(string key)
+    {
+        string json = Preferences.Default.Get(key, string.Empty);
+        if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    private void SetStoredList(string key, List<string> list)
+    {
+        string json = JsonSerializer.Serialize(list ?? new List<string>());
+        Preferences.Default.Set(key, json);
     }
 }

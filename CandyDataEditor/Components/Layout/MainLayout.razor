@@ -1,11 +1,15 @@
-﻿@inherits LayoutComponentBase
+﻿@implements IDisposable
+@inherits LayoutComponentBase
 @using CandyDataEditor.Services
 @inject SqliteDataService DbService
+@inject GameDictionaryService DictionaryService
+@inject IJSRuntime JSRuntime
 
 <div class="app-shell d-flex flex-column vh-100 overflow-hidden">
 
     <!-- TOP PINNED RIBBON BAR -->
-    <RibbonMenuBar OnDatabaseChanged="HandleDatabaseChanged" />
+    <RibbonMenuBar />
+    <SpellcheckInitializer />
 
     <!-- MAIN TWO-COLUMN CONTAINER -->
     <div class="d-flex flex-grow-1 overflow-hidden">
@@ -17,7 +21,20 @@
             <div class="p-2 border-bottom bg-light d-flex flex-column gap-2">
                 <div class="d-flex align-items-center justify-content-between">
                     <span class="fw-bold small">Database Objects (@FilteredObjects.Count())</span>
-                    <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Refresh Objects" @onclick="RefreshDatabaseObjects">🔄</button>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                title="Refresh Objects"
+                                @onclick="RefreshDatabaseObjects"
+                                disabled="@(!DbService.HasActiveDatabase)">
+                            🔄
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                                title="Close Database"
+                                @onclick="CloseCurrentDatabase"
+                                disabled="@(!DbService.HasActiveDatabase)">
+                            ❌
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Filter Input -->
@@ -103,7 +120,7 @@
     private bool isLoadingTables = true;
 
     private string searchFilter = string.Empty;
-    private string typeFilter = "all";
+    private string typeFilter = "table";
 
     [Inject] private NavigationManager NavManager { get; set; } = default!;
 
@@ -113,11 +130,21 @@
 
     protected override async Task OnInitializedAsync()
     {
+        DbService.OnDatabasePathChanged += HandleDatabaseChanged;
         await RefreshDatabaseObjects();
     }
 
     private async Task RefreshDatabaseObjects()
     {
+        if (!DbService.HasActiveDatabase)
+        {
+            dbObjects.Clear();
+            tableRecordKeys.Clear();
+            isLoadingTables = false;
+            StateHasChanged();
+            return;
+        }
+
         isLoadingTables = true;
         StateHasChanged();
 
@@ -171,17 +198,37 @@
     {
         selectedTable = tableName;
 
-        // Pass selection to the workspace via query parameters or page route
         string keyParams = string.Join("&", keyMap.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
         NavManager.NavigateTo($"/editor/{Uri.EscapeDataString(tableName)}?{keyParams}");
+    }
+
+    private async Task CloseCurrentDatabase()
+    {
+        await DbService.CloseDatabaseAsync();
     }
 
     private async Task HandleDatabaseChanged(string newPath)
     {
         expandedTable = null;
         selectedTable = null;
-        await RefreshDatabaseObjects();
-        NavManager.NavigateTo("/editor");
+
+        if (string.IsNullOrEmpty(newPath))
+        {
+            dbObjects.Clear();
+            tableRecordKeys.Clear();
+            isLoadingTables = false;
+            StateHasChanged();
+        }
+        else
+        {
+            await RefreshDatabaseObjects();
+        }
+
+        NavManager.NavigateTo("/");
+    }
+
+    public void Dispose()
+    {
+        DbService.OnDatabasePathChanged -= HandleDatabaseChanged;
     }
 }
-

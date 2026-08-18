@@ -1,0 +1,27 @@
+﻿<!-- Components/SpellcheckInitializer.razor -->
+@using CandyDataEditor.Services
+@inject GameDictionaryService DictionaryService
+@inject IJSRuntime JSRuntime
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Sync and load dictionaries from disk
+                var activeDict = await DictionaryService.SyncAndLoadAllDictionariesAsync();
+                int wordCount = activeDict?.Count ?? 0;
+
+                System.Diagnostics.Debug.WriteLine($"[C# Dictionary] Loaded {wordCount:N0} words successfully.");
+                await JSRuntime.InvokeVoidAsync("setGlobalGameDictionary", activeDict);
+                await JSRuntime.InvokeVoidAsync("console.log", $"[JS Dictionary] Hydrated with {wordCount} words.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Spellcheck Initializer Error]: {ex.Message}");
+            }
+        }
+    }
+}

@@ -2,24 +2,27 @@
 <html lang="en">
 <!-- wwwroot/index.html -->
 <head>
-    <!-- ... other head tags ... -->
-    <!-- Tells the browser where to download TipTap modules from -->
-    <script src="js/tiptap-bundle.min.js"></script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>CandyDataEditor</title>
     <base href="/" />
+
+    <!-- Core App & Theme Styles -->
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="CandyDataEditor.styles.css" />
     <link rel="stylesheet" href="css/dark-mode.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
 
+    <!-- Theme State Inline Handler -->
     <script>
         window.setDarkMode = function (isDark) {
             document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
         };
     </script>
+
+    <!-- Global Utilities & TipTap Core Bundle -->
+    <script src="js/tiptap-bundle.min.js"></script>
 </head>
 
 <body>
@@ -33,8 +36,8 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <script type="module" src="js/tiptap-interop.js"></script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
-
 </body>
 
 </html>
