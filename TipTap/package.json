@@ -1,6 +1,8 @@
 {
+  "name": "tiptap",
+  "version": "0.0.0",
+  "private": true,
   "dependencies": {
-    "@farscrl/tiptap-extension-spellchecker": "^2.0.2",
     "@tiptap/core": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
     "esbuild": "^0.28.2",

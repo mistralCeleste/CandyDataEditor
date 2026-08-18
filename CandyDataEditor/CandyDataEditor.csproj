@@ -84,4 +84,21 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
     </ItemGroup>
 
+	<!-- Custom Build Step for TipTap JS Bundle -->
+	<Target Name="BuildTipTapBundle" BeforeTargets="BeforeBuild"
+			Inputs="../TipTap/tiptap-entry.js;../TipTap/package.json"
+			Outputs="wwwroot/js/tiptap-bundle.js">
+
+		<Message Text="[TipTap Build] Checking node_modules and compiling bundle..." Importance="high" />
+
+		<Exec Command="npm install --no-audit --no-fund"
+			  WorkingDirectory="../TipTap"
+			  Condition="!Exists('../TipTap/node_modules')" />
+
+		<Exec Command="npx esbuild tiptap-entry.js --bundle --outfile=../CandyDataEditor/wwwroot/js/tiptap-bundle.js"
+			  WorkingDirectory="../TipTap" />
+
+		<Message Text="[TipTap Build] Updated tiptap-bundle.js successfully." Importance="high" />
+	</Target>
+
 </Project>

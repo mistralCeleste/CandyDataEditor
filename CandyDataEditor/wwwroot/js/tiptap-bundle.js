@@ -12587,6 +12587,7 @@
     unsetMark: () => unsetMark,
     unsetTextDirection: () => unsetTextDirection,
     updateAttributes: () => updateAttributes,
+    updateDecorations: () => updateDecorations,
     wrapIn: () => wrapIn2,
     wrapInList: () => wrapInList2
   });
@@ -12982,16 +12983,19 @@
     const html = new window.DOMParser().parseFromString(wrappedValue, "text/html").body;
     return removeWhitespaces(html);
   }
+  function isProseMirrorContent(value) {
+    return typeof (value == null ? void 0 : value.nodesBetween) === "function";
+  }
   function createNodeFromContent(content, schema2, options) {
-    if (content instanceof Node2 || content instanceof Fragment) {
+    if (isProseMirrorContent(content)) {
       return content;
     }
+    const isJSONContent = typeof content === "object" && content !== null;
     options = {
       slice: true,
       parseOptions: {},
       ...options
     };
-    const isJSONContent = typeof content === "object" && content !== null;
     const isTextContent = typeof content === "string";
     if (isJSONContent) {
       try {
@@ -13063,6 +13067,9 @@
     }
     return createNodeFromContent("", schema2, options);
   }
+  function isFragment(nodeOrFragment) {
+    return !("type" in nodeOrFragment);
+  }
   function selectionToInsertionEnd2(tr2, startLen, bias) {
     const last = tr2.steps.length - 1;
     if (last < startLen) {
@@ -13081,9 +13088,6 @@
     });
     tr2.setSelection(Selection.near(tr2.doc.resolve(end), bias));
   }
-  var isFragment = (nodeOrFragment) => {
-    return !("type" in nodeOrFragment);
-  };
   var insertContentAt = (position, value, options) => ({ tr: tr2, dispatch, editor }) => {
     var _a2;
     if (dispatch) {
@@ -13133,7 +13137,7 @@
       let { from: from2, to } = typeof position === "number" ? { from: position, to: position } : { from: position.from, to: position.to };
       let isOnlyTextContent = true;
       let isOnlyBlockContent = true;
-      const nodes = isFragment(content) ? content : [content];
+      const nodes = isFragment(content) ? content.content : [content];
       nodes.forEach((node) => {
         node.check();
         isOnlyTextContent = isOnlyTextContent ? node.isText && node.marks.length === 0 : false;
@@ -13150,15 +13154,12 @@
       let newContent;
       if (isOnlyTextContent) {
         if (Array.isArray(value)) {
-          newContent = value.map((v) => v.text || "").join("");
-        } else if (value instanceof Fragment) {
-          let text2 = "";
-          value.forEach((node) => {
-            if (node.text) {
-              text2 += node.text;
-            }
-          });
-          newContent = text2;
+          newContent = value.map((item) => item.text || "").join("");
+        } else if (isProseMirrorContent(value)) {
+          newContent = nodes.map((node) => {
+            var _a22;
+            return (_a22 = node.text) != null ? _a22 : "";
+          }).join("");
         } else if (typeof value === "object" && !!value && !!value.text) {
           newContent = value.text;
         } else {
@@ -13166,7 +13167,7 @@
         }
         tr2.insertText(newContent, from2, to);
       } else {
-        newContent = content;
+        newContent = Fragment.from(nodes);
         const $from = tr2.doc.resolve(from2);
         const $fromNode = $from.node();
         const fromSelectionAtStart = $from.parentOffset === 0;
@@ -13175,7 +13176,7 @@
         if (fromSelectionAtStart && isTextSelection2 && hasContent && isOnlyBlockContent) {
           from2 = Math.max(0, from2 - 1);
         }
-        tr2.replaceWith(from2, to, newContent);
+        tr2.replaceWith(from2, to, nodes);
       }
       if (options.updateSelection) {
         selectionToInsertionEnd2(tr2, tr2.steps.length - 1, -1);
@@ -13500,7 +13501,8 @@
         errorOnInvalidContent: errorOnInvalidContent != null ? errorOnInvalidContent : editor.options.enableContentCheck
       });
       if (dispatch) {
-        tr2.replaceWith(0, doc3.content.size, document2).setMeta("preventUpdate", !emitUpdate);
+        const nodes = isFragment(document2) ? document2.content : [document2];
+        tr2.replaceWith(0, doc3.content.size, nodes).setMeta("preventUpdate", !emitUpdate);
       }
       return true;
     }
@@ -14230,6 +14232,13 @@
       }
     }
     return [node, currentDepth];
+  };
+  var getPreviousBlockSibling = ($pos) => {
+    const parentDepth = $pos.depth - 1;
+    if (parentDepth < 0) return null;
+    const index = $pos.index(parentDepth);
+    if (index === 0) return null;
+    return $pos.node(parentDepth).child(index - 1);
   };
   function getSchemaTypeByName(name, schema2) {
     return schema2.nodes[name] || schema2.marks[name] || null;
@@ -15100,6 +15109,16 @@
     });
     return canUpdate;
   };
+  var DECORATION_MANAGER_PLUGIN_KEY_NAME = "__tiptap_decorations__";
+  var DECORATION_MANAGER_PLUGIN_KEY = new PluginKey(
+    DECORATION_MANAGER_PLUGIN_KEY_NAME
+  );
+  var updateDecorations = (extensionName) => ({ tr: tr2, dispatch }) => {
+    if (dispatch) {
+      tr2.setMeta(DECORATION_MANAGER_PLUGIN_KEY, { type: "force", name: extensionName });
+    }
+    return true;
+  };
   var wrapIn2 = (typeOrName, attributes = {}) => ({ state, dispatch }) => {
     const type = getNodeType(typeOrName, state.schema);
     return wrapIn(type, attributes)(state, dispatch);
@@ -15108,6 +15127,24 @@
     const type = getNodeType(typeOrName, state.schema);
     return wrapInList(type, attributes)(state, dispatch);
   };
+  var depthByEditor = /* @__PURE__ */ new WeakMap();
+  function runInDecorationApplyScope(editor, callback) {
+    var _a2, _b;
+    depthByEditor.set(editor, ((_a2 = depthByEditor.get(editor)) != null ? _a2 : 0) + 1);
+    try {
+      return callback();
+    } finally {
+      const remaining = ((_b = depthByEditor.get(editor)) != null ? _b : 1) - 1;
+      if (remaining > 0) {
+        depthByEditor.set(editor, remaining);
+      } else {
+        depthByEditor.delete(editor);
+      }
+    }
+  }
+  function isInDecorationApplyScope(editor) {
+    return depthByEditor.has(editor);
+  }
   var EventEmitter = class {
     constructor() {
       this.callbacks = {};
@@ -15146,6 +15183,535 @@
     }
     removeAllListeners() {
       this.callbacks = {};
+    }
+  };
+  var isDev = typeof process !== "undefined" && true;
+  function isWidgetDecoration(decoration) {
+    return decoration.kind === "widget";
+  }
+  function decorationsToPMDecorations(decorations, extensionName) {
+    const pmDecorations = [];
+    const widgetKeys = /* @__PURE__ */ new Set();
+    for (const decoration of decorations) {
+      if (decoration.kind === "widget") {
+        if (isWidgetDecoration(decoration)) {
+          widgetKeys.add(decoration.key);
+        }
+      }
+      pmDecorations.push(decoration.toPMDecoration(extensionName));
+    }
+    return { decorations: pmDecorations, widgetKeys };
+  }
+  function buildDecorationSet(doc3, decorations, extensionName) {
+    const { decorations: pmDecorations, widgetKeys } = decorationsToPMDecorations(
+      decorations,
+      extensionName
+    );
+    return { set: DecorationSet.create(doc3, pmDecorations), widgetKeys };
+  }
+  function rangeOwnsPosition({
+    position,
+    from: from2,
+    to,
+    docSize
+  }) {
+    if (position < from2) {
+      return false;
+    }
+    if (position < to) {
+      return true;
+    }
+    return position === to && to === docSize;
+  }
+  function filterOutOfRangeDecorations({
+    decorations,
+    from: from2,
+    to,
+    docSize,
+    extensionName,
+    warnedExtensions
+  }) {
+    return decorations.filter((decoration) => {
+      if (rangeOwnsPosition({ position: decoration.anchor, from: from2, to, docSize })) {
+        return true;
+      }
+      if (decoration.anchor === to) {
+        return false;
+      }
+      if (!warnedExtensions.has(extensionName)) {
+        warnedExtensions.add(extensionName);
+        console.warn(
+          `[tiptap warn]: Extension "${extensionName}" returned a decoration outside the requested range [${from2}, ${to}). It was ignored.`
+        );
+      }
+      return false;
+    });
+  }
+  function widgetKeyOf(decoration) {
+    var _a2;
+    const key = (_a2 = decoration.spec) == null ? void 0 : _a2.key;
+    return typeof key === "string" ? key : void 0;
+  }
+  function findDuplicateWidgetKeys(decorationSet) {
+    var _a2, _b, _c;
+    const extensionsByKey = /* @__PURE__ */ new Map();
+    const counts = /* @__PURE__ */ new Map();
+    for (const decoration of decorationSet.find()) {
+      const key = widgetKeyOf(decoration);
+      if (!key) {
+        continue;
+      }
+      const extension = (_a2 = decoration.spec.extensionName) != null ? _a2 : "unknown";
+      const extensions = (_b = extensionsByKey.get(key)) != null ? _b : /* @__PURE__ */ new Set();
+      extensions.add(extension);
+      extensionsByKey.set(key, extensions);
+      counts.set(key, ((_c = counts.get(key)) != null ? _c : 0) + 1);
+    }
+    return Array.from(extensionsByKey, ([key, extensions]) => ({ key, extensions })).filter(
+      ({ key }) => {
+        var _a22;
+        return ((_a22 = counts.get(key)) != null ? _a22 : 0) > 1;
+      }
+    );
+  }
+  function isAttrStep(step) {
+    return step.jsonID === "attr";
+  }
+  function hasResolvableChangedRange(step) {
+    let hasMappedRange = false;
+    step.getMap().forEach(() => {
+      hasMappedRange = true;
+    });
+    if (hasMappedRange || isAttrStep(step)) {
+      return true;
+    }
+    const positionalStep = step;
+    return typeof positionalStep.from === "number" && typeof positionalStep.to === "number";
+  }
+  function blockRangeFor(doc3, changed) {
+    let from2 = null;
+    let to = 0;
+    let nodeStart = 0;
+    for (let index = 0; index < doc3.childCount; index += 1) {
+      if (nodeStart > changed.to) {
+        break;
+      }
+      const nodeEnd = nodeStart + doc3.child(index).nodeSize;
+      if (nodeEnd >= changed.from) {
+        if (from2 === null) {
+          from2 = nodeStart;
+        }
+        to = nodeEnd;
+      }
+      nodeStart = nodeEnd;
+    }
+    return from2 === null ? null : { from: from2, to };
+  }
+  function getRebuildRanges(tr2, doc3) {
+    if (tr2.steps.some((step) => !hasResolvableChangedRange(step))) {
+      return { type: "full" };
+    }
+    const newRanges = getChangedRanges(tr2).map(({ newRange }) => newRange);
+    tr2.steps.forEach((step, index) => {
+      if (!isAttrStep(step)) {
+        return;
+      }
+      const mapping = tr2.mapping.slice(index);
+      newRanges.push({ from: mapping.map(step.pos, -1), to: mapping.map(step.pos + 1) });
+    });
+    const ranges = [];
+    for (const newRange of newRanges) {
+      const blockRange = blockRangeFor(doc3, newRange);
+      if (blockRange) {
+        ranges.push(blockRange);
+      }
+    }
+    ranges.sort((a, b) => a.from - b.from);
+    const merged = [];
+    for (const range of ranges) {
+      const last = merged[merged.length - 1];
+      if (last && range.from <= last.to) {
+        last.to = Math.max(last.to, range.to);
+      } else {
+        merged.push({ ...range });
+      }
+    }
+    return { type: "ranges", ranges: merged };
+  }
+  function mapDecorationSet(set2, mapping, doc3, widgetKeys) {
+    return set2.map(mapping, doc3, {
+      onRemove: (removedSpec) => {
+        const key = removedSpec == null ? void 0 : removedSpec.key;
+        if (typeof key === "string") {
+          widgetKeys.delete(key);
+        }
+      }
+    });
+  }
+  function mapDecorations(name, previous, tr2) {
+    var _a2, _b;
+    const previousSet = (_a2 = previous.decorationSetsByExtension[name]) != null ? _a2 : DecorationSet.empty;
+    const widgetKeys = new Set((_b = previous.widgetKeysByExtension[name]) != null ? _b : []);
+    const set2 = mapDecorationSet(previousSet, tr2.mapping, tr2.doc, widgetKeys);
+    return { set: set2, widgetKeys };
+  }
+  function mergeDecorationSets(doc3, decorationSetsByExtension) {
+    const allDecorations = Object.values(decorationSetsByExtension).flatMap((set2) => set2.find());
+    return DecorationSet.create(doc3, allDecorations);
+  }
+  function unionWidgetKeys(widgetKeysByExtension) {
+    const merged = /* @__PURE__ */ new Set();
+    for (const keys2 of Object.values(widgetKeysByExtension)) {
+      for (const key of keys2) {
+        merged.add(key);
+      }
+    }
+    return merged;
+  }
+  function validateDecorationSpec(name, spec) {
+    var _a2;
+    const strategy = (_a2 = spec.update) != null ? _a2 : "document";
+    switch (strategy) {
+      case "document":
+        if (spec.createInRange) {
+          throw new Error(
+            `[tiptap error]: Extension "${name}" provides createInRange() but does not use the "changedRanges" decoration update strategy.`
+          );
+        }
+        return;
+      case "changedRanges":
+        if (!spec.createInRange) {
+          throw new Error(
+            `[tiptap error]: Extension "${name}" uses the "changedRanges" decoration update strategy but does not provide createInRange().`
+          );
+        }
+        return;
+      case "manual":
+        if (spec.createInRange) {
+          throw new Error(
+            `[tiptap error]: Extension "${name}" uses the "manual" decoration update strategy, which is not compatible with createInRange(). createInRange() requires the "changedRanges" strategy.`
+          );
+        }
+        if (spec.shouldUpdate) {
+          throw new Error(
+            `[tiptap error]: Extension "${name}" cannot combine the "manual" decoration update strategy with shouldUpdate().`
+          );
+        }
+        return;
+      default:
+        throw new Error(
+          `[tiptap error]: Extension "${name}" uses an unknown decoration update strategy. Expected "document", "changedRanges", or "manual".`
+        );
+    }
+  }
+  function shouldRecomputeDecoration(spec, props, forced) {
+    if (forced) {
+      return true;
+    }
+    if (spec.update === "manual") {
+      return false;
+    }
+    return spec.shouldUpdate ? spec.shouldUpdate(props) : props.tr.docChanged;
+  }
+  var EMPTY_KEYS = /* @__PURE__ */ new Set();
+  var DecorationManager = class {
+    constructor(options) {
+      this.warnedWidgetKeys = /* @__PURE__ */ new Set();
+      this.warnedOutOfRangeExtensions = /* @__PURE__ */ new Set();
+      this.handleBeforeTransaction = ({ nextState }) => {
+        const state = DECORATION_MANAGER_PLUGIN_KEY.getState(nextState);
+        if (state) {
+          this.warnDuplicateWidgetKeys(state);
+        }
+      };
+      this.editor = options.editor;
+      this.entries = this.resolveEntries(options.entries);
+      this.entries.forEach(({ name, spec }) => validateDecorationSpec(name, spec));
+      this.plugin = this.entries.length > 0 ? this.createPlugin() : null;
+      this.editor.on("beforeTransaction", this.handleBeforeTransaction);
+    }
+    destroy() {
+      this.editor.off("beforeTransaction", this.handleBeforeTransaction);
+    }
+    /**
+     * Returns the set of live widget keys from all decoration extensions.
+     * @returns A readonly set of widget keys
+     */
+    liveWidgetKeys() {
+      var _a2, _b;
+      return (_b = (_a2 = DECORATION_MANAGER_PLUGIN_KEY.getState(this.editor.state)) == null ? void 0 : _a2.widgetKeys) != null ? _b : EMPTY_KEYS;
+    }
+    /**
+     * The mounted editor view, or `null` when destroyed. Decoration callbacks
+     * must never receive the placeholder view `editor.view` falls back to.
+     * @returns The mounted editor view, or `null`
+     */
+    get mountedView() {
+      return this.editor.isDestroyed ? null : this.editor.view;
+    }
+    /**
+     * Resolves decoration entries by calling the addDecorations function for each extension entry.
+     * @param entries The decoration manager entries to resolve
+     * @returns An array of resolved decoration entries
+     */
+    resolveEntries(entries) {
+      const resolved = [];
+      for (const { name, addDecorations } of entries) {
+        const spec = addDecorations();
+        if (spec) {
+          resolved.push({ name, spec });
+        }
+      }
+      return resolved;
+    }
+    /**
+     * Creates the ProseMirror plugin for managing decorations.
+     * @returns A ProseMirror plugin with state management
+     */
+    createPlugin() {
+      const { editor, entries } = this;
+      return new Plugin({
+        key: DECORATION_MANAGER_PLUGIN_KEY,
+        state: {
+          init: (_config, state) => {
+            const decorationSetsByExtension = {};
+            const widgetKeysByExtension = {};
+            for (const { name, spec } of entries) {
+              const { set: set2, widgetKeys } = this.buildFullSet(name, spec, state);
+              decorationSetsByExtension[name] = set2;
+              widgetKeysByExtension[name] = widgetKeys;
+            }
+            const managerState = {
+              decorationSetsByExtension,
+              widgetKeysByExtension,
+              mergedDecorationSet: this.buildMergedSet(state.doc, decorationSetsByExtension),
+              widgetKeys: unionWidgetKeys(widgetKeysByExtension)
+            };
+            this.warnDuplicateWidgetKeys(managerState);
+            return managerState;
+          },
+          apply: (tr2, previous, oldState, newState) => {
+            const meta = tr2.getMeta(DECORATION_MANAGER_PLUGIN_KEY);
+            const forceAll = (meta == null ? void 0 : meta.type) === "force" && !meta.name;
+            const forceName = (meta == null ? void 0 : meta.type) === "force" ? meta.name : void 0;
+            const decorationSetsByExtension = {};
+            const widgetKeysByExtension = {};
+            const recomputedNames = /* @__PURE__ */ new Set();
+            runInDecorationApplyScope(editor, () => {
+              for (const { name, spec } of entries) {
+                const forced = forceAll || forceName === name;
+                const shouldRecompute = shouldRecomputeDecoration(
+                  spec,
+                  { editor, tr: tr2, oldState, newState },
+                  forced
+                );
+                if (!shouldRecompute) {
+                  const result = mapDecorations(name, previous, tr2);
+                  decorationSetsByExtension[name] = result.set;
+                  widgetKeysByExtension[name] = result.widgetKeys;
+                } else if (spec.update === "changedRanges" && tr2.docChanged && !forced) {
+                  const result = this.applyChangedRangesRecompute(name, spec, previous, tr2, newState);
+                  decorationSetsByExtension[name] = result.set;
+                  widgetKeysByExtension[name] = result.widgetKeys;
+                  recomputedNames.add(name);
+                } else {
+                  const { set: set2, widgetKeys } = this.buildFullSet(name, spec, newState);
+                  decorationSetsByExtension[name] = set2;
+                  widgetKeysByExtension[name] = widgetKeys;
+                  recomputedNames.add(name);
+                }
+              }
+            });
+            if (recomputedNames.size === 0 && !tr2.docChanged) {
+              return previous;
+            }
+            const mergedDecorationSet = this.mergeAfterApply({
+              entries,
+              previous,
+              tr: tr2,
+              decorationSetsByExtension,
+              recomputedNames
+            });
+            return {
+              decorationSetsByExtension,
+              widgetKeysByExtension,
+              mergedDecorationSet,
+              widgetKeys: unionWidgetKeys(widgetKeysByExtension)
+            };
+          }
+        },
+        props: {
+          decorations(state) {
+            var _a2, _b;
+            return (_b = (_a2 = DECORATION_MANAGER_PLUGIN_KEY.getState(state)) == null ? void 0 : _a2.mergedDecorationSet) != null ? _b : DecorationSet.empty;
+          }
+        }
+      });
+    }
+    /**
+     * Applies changed ranges recomputation to a decoration set, dropping stale decorations and rebuilding only the touched blocks.
+     * @param name The name of the decoration extension
+     * @param spec The decoration spec
+     * @param previous The previous decoration manager state
+     * @param tr The transaction to apply
+     * @param newState The new editor state
+     * @returns The updated decoration set and widget keys
+     */
+    applyChangedRangesRecompute(name, spec, previous, tr2, newState) {
+      const resolution = getRebuildRanges(tr2, newState.doc);
+      if (resolution.type === "full") {
+        return this.buildFullSet(name, spec, newState);
+      }
+      return this.rebuildRanges(name, spec, previous, tr2, newState, resolution.ranges);
+    }
+    /**
+     * Rebuilds decorations for the changed block ranges: maps the previous set
+     * forward, then for each range removes stale decorations, calls
+     * `createInRange`, and adds the new ones while syncing widget keys.
+     * @param name The extension name.
+     * @param spec The decoration spec.
+     * @param previous The previous decoration manager state.
+     * @param tr The transaction to apply.
+     * @param newState The new editor state.
+     * @param ranges The block ranges to rebuild.
+     * @returns The updated decoration set and widget keys.
+     */
+    rebuildRanges(name, spec, previous, tr2, newState, ranges) {
+      var _a2, _b;
+      const previousSet = (_a2 = previous.decorationSetsByExtension[name]) != null ? _a2 : DecorationSet.empty;
+      const widgetKeys = new Set((_b = previous.widgetKeysByExtension[name]) != null ? _b : []);
+      let set2 = mapDecorationSet(previousSet, tr2.mapping, tr2.doc, widgetKeys);
+      const docSize = newState.doc.content.size;
+      for (const { from: from2, to } of ranges) {
+        const stale = set2.find(from2, to).filter((decoration) => rangeOwnsPosition({ position: decoration.from, from: from2, to, docSize }));
+        for (const decoration of stale) {
+          const key = widgetKeyOf(decoration);
+          if (key) {
+            widgetKeys.delete(key);
+          }
+        }
+        set2 = set2.remove(stale);
+        const rangeDecorations = filterOutOfRangeDecorations({
+          decorations: this.runCreate(
+            name,
+            "createInRange",
+            () => spec.createInRange({
+              editor: this.editor,
+              state: newState,
+              view: this.mountedView,
+              from: from2,
+              to
+            })
+          ),
+          from: from2,
+          to,
+          docSize,
+          extensionName: name,
+          warnedExtensions: this.warnedOutOfRangeExtensions
+        });
+        const { decorations: pmDecorations, widgetKeys: addedKeys } = decorationsToPMDecorations(
+          rangeDecorations,
+          name
+        );
+        set2 = set2.add(newState.doc, pmDecorations);
+        for (const key of addedKeys) {
+          widgetKeys.add(key);
+        }
+      }
+      return { set: set2, widgetKeys };
+    }
+    /**
+     * Builds a full decoration set for the entire document.
+     * @param name The name of the decoration extension
+     * @param spec The decoration spec
+     * @param state The editor state
+     * @returns The decoration set and widget keys
+     */
+    buildFullSet(name, spec, state) {
+      const decorations = this.runCreate(
+        name,
+        "create",
+        () => spec.create({
+          editor: this.editor,
+          state,
+          view: this.mountedView
+        })
+      );
+      return buildDecorationSet(state.doc, decorations, name);
+    }
+    /**
+     * Runs a decoration callback and swallows anything it throws. These run inside
+     * `state.apply`, where an uncaught error would abort the whole transaction.
+     * @param name The extension name.
+     * @param method The callback name, used in the error message.
+     * @param create The callback to run.
+     * @returns The decorations, or an empty array if the callback threw.
+     */
+    runCreate(name, method, create) {
+      try {
+        return create();
+      } catch (error2) {
+        console.error(
+          `[tiptap error]: Extension "${name}" threw in \`addDecorations().${method}()\`. Its decorations were dropped for this update.`,
+          error2
+        );
+        return [];
+      }
+    }
+    warnDuplicateWidgetKeys(state) {
+      if (!isDev) {
+        return;
+      }
+      if (state.widgetKeys.size === 0) {
+        this.warnedWidgetKeys.clear();
+        return;
+      }
+      const duplicateKeys = findDuplicateWidgetKeys(state.mergedDecorationSet);
+      const nextWarningKeys = new Set(duplicateKeys.map(({ key }) => key));
+      for (const { key, extensions } of duplicateKeys) {
+        if (this.warnedWidgetKeys.has(key)) {
+          continue;
+        }
+        const names = Array.from(extensions).map((name) => `"${name}"`).join(", ");
+        console.warn(
+          `[tiptap warn]: Duplicate widget decoration key "${key}" in extension${extensions.size === 1 ? "" : "s"} ${names}. Widget decoration keys must be globally unique, otherwise ProseMirror misplaces the widget DOM. Use a stable, unique key (e.g. \`comment-\${id}\`).`
+        );
+      }
+      this.warnedWidgetKeys = nextWarningKeys;
+    }
+    /**
+     * Builds the merged DecorationSet during init. Skips the merge for a
+     * single extension since its per-extension set is already correct.
+     * @param doc The document to build the merged set for.
+     * @param decorationSetsByExtension The per-extension decoration sets.
+     * @returns The merged decoration set.
+     */
+    buildMergedSet(doc3, decorationSetsByExtension) {
+      const names = Object.keys(decorationSetsByExtension);
+      if (names.length === 1) {
+        return decorationSetsByExtension[names[0]];
+      }
+      return mergeDecorationSets(doc3, decorationSetsByExtension);
+    }
+    /**
+     * Computes the merged DecorationSet after apply. Single extension skips the
+     * merge; nothing recomputed maps the previous merged set forward; otherwise
+     * the merge is rebuilt from the per-extension sets.
+     */
+    mergeAfterApply({
+      entries,
+      previous,
+      tr: tr2,
+      decorationSetsByExtension,
+      recomputedNames
+    }) {
+      if (entries.length === 1) {
+        return decorationSetsByExtension[entries[0].name];
+      }
+      if (recomputedNames.size === 0) {
+        return previous.mergedDecorationSet.map(tr2.mapping, tr2.doc);
+      }
+      return mergeDecorationSets(tr2.doc, decorationSetsByExtension);
     }
   };
   function canInsertNode(state, nodeType) {
@@ -16241,6 +16807,7 @@ ${indentedChild}`;
     constructor(extensions, editor) {
       this.splittableMarks = [];
       this.nonClearableMarks = [];
+      this.decorationManager = null;
       this.editor = editor;
       this.baseExtensions = extensions;
       this.extensions = resolveExtensions(extensions);
@@ -16348,7 +16915,44 @@ ${indentedChild}`;
         }
         return plugins;
       });
+      const decorationPlugin = this.createDecorationPlugin();
+      if (decorationPlugin) {
+        allPlugins.push(decorationPlugin);
+      }
       return allPlugins;
+    }
+    /**
+     * Aggregates decorations from extensions into a single plugin, or returns null
+     * if none exist. Destroys the previous manager to avoid orphaned listeners.
+     * @returns A ProseMirror plugin or `null`
+     * @example
+     * const plugin = editor.extensionManager.createDecorationPlugin()
+     */
+    createDecorationPlugin() {
+      var _a2;
+      const { editor } = this;
+      (_a2 = this.decorationManager) == null ? void 0 : _a2.destroy();
+      const entries = [];
+      this.extensions.forEach((extension) => {
+        const context = {
+          name: extension.name,
+          options: extension.options,
+          storage: this.editor.extensionStorage[extension.name],
+          editor,
+          type: getSchemaTypeByName(extension.name, this.schema)
+        };
+        const addDecorations = getExtensionField(
+          extension,
+          "addDecorations",
+          context
+        );
+        if (!addDecorations) {
+          return;
+        }
+        entries.push({ name: extension.name, addDecorations });
+      });
+      this.decorationManager = new DecorationManager({ editor, entries });
+      return this.decorationManager.plugin;
     }
     /**
      * Get all attributes from the extensions.
@@ -16527,6 +17131,8 @@ ${indentedChild}`;
      * and non-matching forward links must remain intact.
      */
     destroy() {
+      var _a2;
+      (_a2 = this.decorationManager) == null ? void 0 : _a2.destroy();
       this.extensions.forEach((extension) => {
         let current = extension;
         while (current.parent) {
@@ -16539,6 +17145,7 @@ ${indentedChild}`;
       });
       this.extensions = [];
       this.baseExtensions = [];
+      this.decorationManager = null;
       this.schema = null;
       this.editor = null;
     }
@@ -17050,6 +17657,25 @@ ${indentedChild}`;
       ];
     }
   });
+  var hasChecked = false;
+  function warnOnDuplicatedProseMirrorModel(schema2) {
+    if (hasChecked) {
+      return;
+    }
+    hasChecked = true;
+    let content;
+    try {
+      content = ReplaceStep.fromJSON(schema2, { from: 0, to: 0 }).slice.content;
+    } catch {
+      return;
+    }
+    if (content instanceof Fragment) {
+      return;
+    }
+    console.warn(
+      "[tiptap warn]: prosemirror-model is loaded more than once. Wrapping and splitting nodes will fail. Deduplicate it in your lock file, or alias it to a single copy in your bundler."
+    );
+  }
   var NodePos = class _NodePos {
     constructor(pos, editor, isBlock = false, node = null) {
       this.currentNode = null;
@@ -17317,6 +17943,7 @@ img.ProseMirror-separator {
       this.isInitialized = false;
       this.extensionStorage = {};
       this.instanceId = Math.random().toString(36).slice(2, 9);
+      this.hasWarnedStaleDecorationRead = false;
       this.options = {
         element: typeof document !== "undefined" ? document.createElement("div") : null,
         content: "",
@@ -17386,6 +18013,7 @@ img.ProseMirror-separator {
           selection: selection || void 0
         });
       }
+      warnOnDuplicatedProseMirrorModel(this.schema);
       if (this.options.element) {
         this.mount(this.options.element);
       }
@@ -17420,6 +18048,7 @@ img.ProseMirror-separator {
      */
     unmount() {
       if (this.editorView) {
+        this.editorState = this.editorView.state;
         const dom = this.editorView.dom;
         if (dom == null ? void 0 : dom.editor) {
           delete dom.editor;
@@ -17551,6 +18180,12 @@ img.ProseMirror-separator {
      * Returns the editor state.
      */
     get state() {
+      if (isDev && !this.hasWarnedStaleDecorationRead && isInDecorationApplyScope(this)) {
+        this.hasWarnedStaleDecorationRead = true;
+        console.warn(
+          "[tiptap warn]: `editor.state` was read while decoration `create()` was running. It returns the pre-transaction document. Use the `state` argument passed to `create()` instead. Helpers like `editor.isActive()` read `editor.state` too, so pass `state` to their standalone versions instead of calling them on the editor."
+        );
+      }
       if (this.editorView) {
         this.editorState = this.view.state;
       }
@@ -18096,7 +18731,7 @@ img.ProseMirror-separator {
   // node_modules/@tiptap/extension-blockquote/dist/index.js
   var handleBackspace = (editor, type) => {
     var _a2;
-    const { state, view } = editor;
+    const { state } = editor;
     const { selection } = state;
     if (!selection.empty) return false;
     const { $from } = selection;
@@ -18116,11 +18751,18 @@ img.ProseMirror-separator {
     const blockStart = $from.before();
     const insideBlockquoteEnd = blockStart - 1;
     const targetPos = insideBlockquoteEnd - 1;
-    const { tr: tr2 } = state;
-    tr2.delete(blockStart, $from.after()).insert(targetPos, $from.parent.content);
-    tr2.setSelection(TextSelection.create(tr2.doc, targetPos));
-    view.dispatch(tr2.scrollIntoView());
-    return true;
+    return editor.commands.command(({ tr: tr2, dispatch }) => {
+      if (!dispatch) {
+        return true;
+      }
+      const content = $from.parent.content;
+      const slice2 = new Slice(content, 0, 0);
+      tr2.replace(targetPos, $from.after(), slice2);
+      tr2.setSelection(TextSelection.create(tr2.doc, targetPos + content.size));
+      tr2.scrollIntoView();
+      dispatch(tr2);
+      return true;
+    });
   };
   var inputRegex = /^\s*>\s$/;
   var Blockquote = Node3.create({
@@ -21291,6 +21933,7 @@ ${prefix}
     getNextListDepth: () => getNextListDepth,
     handleBackspace: () => handleBackspace2,
     handleDelete: () => handleDelete,
+    handleTab: () => handleTab,
     hasListBefore: () => hasListBefore,
     hasListItemAfter: () => hasListItemAfter,
     hasListItemBefore: () => hasListItemBefore,
@@ -21365,6 +22008,11 @@ ${prefix}
     if (!isAtStartOfNode(editor.state)) {
       return false;
     }
+    const { $from } = editor.state.selection;
+    const itemDepth = $from.depth - 1;
+    if ($from.node(itemDepth).type !== editor.schema.nodes[name] || $from.index(itemDepth) !== 0) {
+      return false;
+    }
     return editor.chain().liftListItem(name).run();
   };
   var nextListIsDeeper = (typeOrName, state) => {
@@ -21408,6 +22056,34 @@ ${prefix}
       return editor.chain().joinForward().joinBackward().run();
     }
     return editor.commands.joinItemForward();
+  };
+  var handleTab = (editor, name, parentListTypes) => {
+    const { state } = editor;
+    const { selection } = state;
+    if (!selection.empty) return false;
+    const { $from } = selection;
+    if ($from.parentOffset !== 0) return false;
+    if (!$from.parent.isTextblock) return false;
+    if (isNodeActive(state, name)) return false;
+    const previous = getPreviousBlockSibling($from);
+    if (!previous || !parentListTypes.includes(previous.type.name)) return false;
+    const lastItem = previous.lastChild;
+    if (!lastItem || lastItem.type.name !== name) return false;
+    const block2 = $from.parent;
+    if (!lastItem.canReplace(lastItem.childCount, lastItem.childCount, Fragment.from(block2))) {
+      return false;
+    }
+    const blockStart = $from.before();
+    const blockEnd = $from.after();
+    const insideLastItemEnd = blockStart - 2;
+    return editor.commands.command(({ tr: tr2, dispatch }) => {
+      if (dispatch) {
+        tr2.delete(blockStart, blockEnd).insert(insideLastItemEnd, Fragment.from(block2));
+        tr2.setSelection(TextSelection.create(tr2.doc, insideLastItemEnd + 1));
+        tr2.scrollIntoView();
+      }
+      return true;
+    });
   };
   var hasListItemAfter = (typeOrName, state) => {
     var _a2;
@@ -21511,6 +22187,17 @@ ${prefix}
             }
           });
           return handled;
+        },
+        Tab: ({ editor }) => {
+          for (const { itemName, wrapperNames } of this.options.listTypes) {
+            if (editor.state.schema.nodes[itemName] === void 0) {
+              continue;
+            }
+            if (handleTab(editor, itemName, wrapperNames)) {
+              return true;
+            }
+          }
+          return false;
         }
       };
     }
@@ -21523,6 +22210,7 @@ ${prefix}
     heading: /^#{1,6}(?:\s|$)/,
     bulletItem: /^[-+*]\s+/,
     codeFence: /^(?:```|~~~)/,
+    blockMath: /^\$\$/,
     thematicBreak: /^(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})$/
   };
   function isOrderedListMarkerLine(line) {
@@ -21533,7 +22221,7 @@ ${prefix}
     return PARAGRAPH_INTERRUPTERS.bulletItem.test(trimmedLine) || isOrderedListMarkerLine(trimmedLine) || PARAGRAPH_INTERRUPTERS.heading.test(trimmedLine) || // dash breaks are excluded: "---" directly below paragraph text is a
     // setext heading underline, not a thematic break
     PARAGRAPH_INTERRUPTERS.thematicBreak.test(trimmedLine) && !trimmedLine.startsWith("-") || // oxlint-disable-next-line prefer-string-starts-ends-with
-    /^>\s?/.test(trimmedLine) || PARAGRAPH_INTERRUPTERS.codeFence.test(trimmedLine);
+    /^>\s?/.test(trimmedLine) || PARAGRAPH_INTERRUPTERS.codeFence.test(trimmedLine) || PARAGRAPH_INTERRUPTERS.blockMath.test(trimmedLine);
   }
   function interruptsLazyContinuation(line) {
     return Object.values(PARAGRAPH_INTERRUPTERS).some((pattern) => pattern.test(line));
@@ -21974,6 +22662,11 @@ ${prefix}
     }
   });
   var inputRegex2 = /^\s*(\[([( |x])?\])\s$/;
+  var visuallyHiddenStyle = "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0";
+  var getCheckboxLabel = (node, checked, a11y) => {
+    var _a2;
+    return ((_a2 = a11y == null ? void 0 : a11y.checkboxLabel) == null ? void 0 : _a2.call(a11y, node, checked)) || `Task item checkbox for ${node.textContent || "empty task item"}`;
+  };
   var TaskItem = Node3.create({
     name: "taskItem",
     addOptions() {
@@ -22007,7 +22700,11 @@ ${prefix}
       return [
         {
           tag: `li[data-type="${this.name}"]`,
-          priority: 51
+          priority: 51,
+          contentElement: (element) => {
+            var _a2;
+            return (_a2 = element.querySelector("div")) != null ? _a2 : element;
+          }
         }
       ];
     },
@@ -22078,9 +22775,11 @@ ${prefix}
         const checkboxStyler = document.createElement("span");
         const checkbox = document.createElement("input");
         const content = document.createElement("div");
+        checkboxStyler.style.cssText = visuallyHiddenStyle;
         const updateA11Y = (currentNode) => {
-          var _a2, _b;
-          checkbox.ariaLabel = ((_b = (_a2 = this.options.a11y) == null ? void 0 : _a2.checkboxLabel) == null ? void 0 : _b.call(_a2, currentNode, checkbox.checked)) || `Task item checkbox for ${currentNode.textContent || "empty task item"}`;
+          const label = getCheckboxLabel(currentNode, currentNode.attrs.checked, this.options.a11y);
+          checkbox.setAttribute("aria-label", label);
+          checkboxStyler.textContent = label;
         };
         updateA11Y(node);
         checkboxWrapper.contentEditable = "false";
@@ -30348,32 +31047,6 @@ ${prefix}
             let next = parent.child(index + 1);
             return m.isInSet(next.marks) && (!next.isText || /\S/.test(next.text));
           });
-        let leading = trailing;
-        trailing = "";
-        if (node && node.isText && marks.some((mark) => {
-          let info = this.getMark(mark.type.name);
-          return info && info.expelEnclosingWhitespace && !mark.isInSet(active);
-        })) {
-          let [_, lead, rest] = /^(\s*)(.*)$/m.exec(node.text);
-          if (lead) {
-            leading += lead;
-            node = rest ? node.withText(rest) : null;
-            if (!node)
-              marks = active;
-          }
-        }
-        if (node && node.isText && marks.some((mark) => {
-          let info = this.getMark(mark.type.name);
-          return info && info.expelEnclosingWhitespace && !this.isMarkAhead(parent, index + 1, mark);
-        })) {
-          let [_, rest, trail] = /^(.*?)(\s*)$/m.exec(node.text);
-          if (trail) {
-            trailing = trail;
-            node = rest ? node.withText(rest) : null;
-            if (!node)
-              marks = active;
-          }
-        }
         let inner = marks.length ? marks[marks.length - 1] : null;
         let noEsc = inner && this.getMark(inner.type.name).escape === false;
         let len = marks.length - (noEsc ? 1 : 0);
@@ -30397,8 +31070,35 @@ ${prefix}
         let keep = 0;
         while (keep < Math.min(active.length, len) && marks[keep].eq(active[keep]))
           ++keep;
-        while (keep < active.length)
-          this.text(this.markString(active.pop(), false, parent, index), false);
+        let leading = trailing;
+        trailing = "";
+        if (node && node.isText && marks.some((mark) => {
+          let info = this.getMark(mark.type.name);
+          return info && info.expelEnclosingWhitespace && !active.some((m, i2) => i2 < keep && m.eq(mark));
+        })) {
+          let [_, lead, rest] = /^(\s*)(.*)$/m.exec(node.text);
+          if (lead) {
+            leading += lead;
+            node = rest ? node.withText(rest) : null;
+            if (!node)
+              marks = active;
+          }
+        }
+        if (node && node.isText && marks.some((mark) => {
+          let info = this.getMark(mark.type.name);
+          return info && info.expelEnclosingWhitespace && !this.isMarkAhead(parent, index + 1, mark);
+        })) {
+          let [_, rest, trail] = /^(.*?)(\s*)$/m.exec(node.text);
+          if (trail) {
+            trailing = trail;
+            node = rest ? node.withText(rest) : null;
+            if (!node)
+              marks = active;
+          }
+        }
+        if (node || index == parent.childCount)
+          while (keep < active.length)
+            this.text(this.markString(active.pop(), false, parent, index), false);
         if (leading)
           this.text(leading);
         if (node) {
@@ -30413,9 +31113,8 @@ ${prefix}
           else
             this.render(node, parent, index);
           this.atBlockStart = false;
-        }
-        if ((node === null || node === void 0 ? void 0 : node.isText) && node.nodeSize > 0) {
-          this.atBlockStart = false;
+          if (node.isText && node.nodeSize > 0)
+            this.atBlockStart = false;
         }
       };
       parent.forEach(progress);
