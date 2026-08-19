@@ -1,0 +1,116 @@
+﻿<!-- Components/RibbonMenuBar.razor -->
+@namespace CandyDataEditor.Components.Menus
+@using CandyDataEditor.Services
+@using System.IO
+@using System.Diagnostics
+@inject SqliteDataService DbService
+@inject FileDialogService FileDialog
+@inject GameDictionaryService DictionaryService
+@inject IJSRuntime JSRuntime
+
+<div class="ribbon-bar border-bottom bg-light px-3 py-1 d-flex align-items-center justify-content-between shadow-sm position-relative">
+    <div class="d-flex align-items-center gap-1">
+
+        <!-- FILE MENU -->
+        <div class="dropdown position-relative">
+            <button class="btn btn-sm @(openMenu == "file" ? "btn-secondary" : "btn-outline-secondary") fw-bold"
+                    type="button"
+                    @onclick='() => ToggleMenu("file")'>
+                📁 File
+            </button>
+            @if (openMenu == "file")
+            {
+                <div class="dropdown-menu show shadow position-absolute start-0 mt-1 py-1" style="z-index: 2000; min-width: 220px;">
+                    <button class="dropdown-item" @onclick="OpenDatabaseFileDialog">📂 Open Database...</button>
+                    <button class="dropdown-item" @onclick="SaveDatabaseAsDialog">💾 Save As...</button>
+                    <button class="dropdown-item text-danger d-flex align-items-center @(!DbService.HasActiveDatabase ? "disabled" : "")"
+                            @onclick="CloseCurrentDatabase"
+                            disabled="@(!DbService.HasActiveDatabase)">
+                        <i class="bi bi-x-circle me-2"></i>Close Database
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-header text-uppercase small text-muted">Recent Databases</div>
+                    @if (DbService.Config.RecentDatabases.Any())
+                    {
+                        @foreach (var dbPath in DbService.Config.RecentDatabases)
+                        {
+                            bool isCurrentDb = string.Equals(dbPath, DbService.CurrentDatabasePath, StringComparison.OrdinalIgnoreCase);
+
+                            <button class="dropdown-item text-truncate d-flex align-items-center justify-content-between @(isCurrentDb ? "active fw-bold" : "")"
+                                    style="max-width: 320px;"
+                                    title="@dbPath"
+                                    @onclick="() => LoadRecentDatabase(dbPath)">
+                                <span>⏱️ @ShortenPath(dbPath)</span>
+                                @if (isCurrentDb)
+                                {
+                                    <span class="badge bg-success ms-2">Active</span>
+                                }
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <span class="dropdown-item disabled text-muted">No recent files</span>
+                    }
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item text-danger" @onclick="ExitApplication">❌ Exit</button>
+                </div>
+            }
+        </div>
+
+        <!-- SETTINGS MENU -->
+        <div class="dropdown position-relative">
+            <button class="btn btn-sm @(openMenu == "settings" ? "btn-secondary" : "btn-outline-secondary") fw-bold"
+                    type="button"
+                    @onclick='() => ToggleMenu("settings")'>
+                ⚙️ Settings
+            </button>
+            @if (openMenu == "settings")
+            {
+                <div class="dropdown-menu show shadow position-absolute start-0 mt-1 py-1" style="z-index: 2000; min-width: 220px;">
+                    <button class="dropdown-item" @onclick='() => OpenSettings("ligature")'>🔤 Ligature Font Settings</button>
+                    <button class="dropdown-item" @onclick='() => OpenSettings("dictionary")'>📖 Spellcheck Dictionaries</button>
+                    <button class="dropdown-item" @onclick='() => OpenSettings("editor")'>🗄️ SQLite Editor Config</button>
+                    <button class="dropdown-item" @onclick='() => OpenSettings("ui")'>🎨 UI & Dark Mode</button>
+                </div>
+            }
+        </div>
+
+        <!-- EXPORT MENU -->
+        <div class="dropdown position-relative">
+            <button class="btn btn-sm @(openMenu == "export" ? "btn-secondary" : "btn-outline-secondary") fw-bold"
+                    type="button"
+                    @onclick='() => ToggleMenu("export")'>
+                📤 Export
+            </button>
+            @if (openMenu == "export")
+            {
+                <div class="dropdown-menu show shadow position-absolute start-0 mt-1 py-1" style="z-index: 2000; min-width: 240px;">
+                    <div class="px-3 py-1">
+                        <label class="form-label mb-1 small fw-bold">Scope:</label>
+                        <div class="btn-group btn-group-sm w-100" role="group">
+                            <button type="button" class="btn @(exportScope == "all" ? "btn-primary" : "btn-outline-primary")" @onclick='() => exportScope = "all"'>All</button>
+                            <button type="button" class="btn @(exportScope == "table" ? "btn-primary" : "btn-outline-primary")" @onclick='() => exportScope = "table"'>Tables</button>
+                            <button type="button" class="btn @(exportScope == "view" ? "btn-primary" : "btn-outline-primary")" @onclick='() => exportScope = "view"'>Views</button>
+                        </div>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item" @onclick='() => ExportData("tsv")'>📄 Tab-Delimited (.TSV)</button>
+                    <button class="dropdown-item" @onclick='() => ExportData("csv")'>📊 Comma-Delimited (.CSV)</button>
+                    <button class="dropdown-item" @onclick='() => ExportData("xml")'>🏷️ XML Document (.XML)</button>
+                    <button class="dropdown-item" @onclick='() => ExportData("json")'>📦 JSON Data (.JSON)</button>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item fw-bold text-primary" @onclick='() => ExportData("html-cards")'>🌐 Interactive HTML Cards Bundle</button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Active DB Name Indicator -->
+    <div class="small text-muted text-truncate ms-3" style="max-width: 350px;" title="@DbService.CurrentDatabasePath">
+        <strong>Current DB:</strong> @(string.IsNullOrEmpty(DbService.CurrentDatabasePath) ? "None" : Path.GetFileName(DbService.CurrentDatabasePath))
+    </div>
+</div>
+
+<!-- SETTINGS MODAL DIALOG -->
+<SettingsDialog @bind-IsOpen="isSettingsOpen" DefaultTab="@activeSettingsTab" />

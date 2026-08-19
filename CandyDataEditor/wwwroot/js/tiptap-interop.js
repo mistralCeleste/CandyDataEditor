@@ -51,6 +51,12 @@ window.execTipTapCommand = function (elementId, commandName, value) {
         case 'italic':
             editor.chain().focus().toggleItalic().run();
             break;
+        case 'heading1':
+            editor.chain().focus().toggleHeading({ level: 1 }).run();
+            break;
+        case 'heading2':
+            editor.chain().focus().toggleHeading({ level: 2 }).run();
+            break;
         case 'actionParent':
             editor.chain().focus().toggleActionHeading({ level: 1 }).run();
             break;

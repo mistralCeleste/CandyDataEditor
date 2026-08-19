@@ -1,0 +1,90 @@
+﻿@namespace CandyDataEditor.Components.Layout
+@using CandyDataEditor.Services
+
+<aside class="sidebar-panel border-end bg-body-tertiary d-flex flex-column" style="width: 320px; min-width: 280px; max-width: 400px;">
+    <!-- Filter Header -->
+    <div class="p-2 border-bottom bg-light d-flex flex-column gap-2">
+        <div class="d-flex align-items-center justify-content-between">
+            <span class="fw-bold small">Database Objects (@FilteredObjects.Count())</span>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                        title="Refresh Objects"
+                        @onclick="RefreshDatabaseObjectsAsync"
+                        disabled="@(!DbService.HasActiveDatabase)">
+                    🔄
+                </button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                        title="Close Database"
+                        @onclick="CloseCurrentDatabaseAsync"
+                        disabled="@(!DbService.HasActiveDatabase)">
+                    ❌
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter Input -->
+        <input type="text" class="form-control form-control-sm"
+               placeholder="🔍 Filter tables/views..."
+               @bind="searchFilter" @bind:event="oninput" />
+
+        <!-- Scope Buttons -->
+        <div class="btn-group btn-group-sm w-100" role="group">
+            <button type="button" class="btn @(typeFilter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick='() => typeFilter = "all"'>All</button>
+            <button type="button" class="btn @(typeFilter == "table" ? "btn-primary" : "btn-outline-primary")" @onclick='() => typeFilter = "table"'>Tables</button>
+            <button type="button" class="btn @(typeFilter == "view" ? "btn-primary" : "btn-outline-primary")" @onclick='() => typeFilter = "view"'>Views</button>
+        </div>
+    </div>
+
+    <!-- Scrollable Object List & Accordions -->
+    <div class="list-group list-group-flush overflow-auto flex-grow-1">
+        @if (isLoadingTables)
+        {
+            <div class="p-3 text-muted text-center small">Loading objects...</div>
+        }
+        else
+        {
+            @foreach (var obj in FilteredObjects)
+            {
+                bool isExpanded = expandedTable == obj.Name;
+                bool isSelected = selectedTable == obj.Name;
+
+                <div class="list-group-item p-0 border-bottom">
+                    <!-- Accordion Table Header -->
+                    <div class="d-flex justify-content-between align-items-center p-2 cursor-pointer @(isSelected ? "bg-primary text-white fw-bold" : "bg-body-secondary")"
+                         @onclick="() => ToggleTableAccordionAsync(obj.Name)">
+                        <span class="text-truncate" style="max-width: 200px;" title="@obj.Name">
+                            @(obj.Type == "view" ? "👁️" : "📄") @obj.Name
+                        </span>
+                        <span class="badge @(obj.Type == "view" ? "bg-info text-dark" : "bg-secondary")">
+                            @(isExpanded ? "▲" : "▼")
+                        </span>
+                    </div>
+
+                    <!-- Accordion Primary Key Sub-List -->
+                    @if (isExpanded)
+                    {
+                        <div class="bg-body border-top">
+                            @if (tableRecordKeys.ContainsKey(obj.Name) && tableRecordKeys[obj.Name].Any())
+                            {
+                                @foreach (var keyMap in tableRecordKeys[obj.Name])
+                                {
+                                    string label = string.Join(" | ", keyMap.Values);
+
+                                    <button type="button"
+                                            class="list-group-item list-group-item-action border-0 ps-4 py-1 small text-truncate"
+                                            @onclick="() => NavigateToRecord(obj.Name, keyMap)">
+                                        🔑 @label
+                                    </button>
+                                }
+                            }
+                            else
+                            {
+                                <div class="ps-4 py-2 small text-muted">No records found.</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</aside>

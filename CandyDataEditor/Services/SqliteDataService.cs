@@ -1,4 +1,5 @@
 ﻿// Services/SqliteDataService.cs
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -19,8 +20,8 @@ public class SqliteDataService
     public SqliteDataService(SqliteEditorConfig config)
     {
         Config = config;
-        _dbPath = Path.Combine(FileSystem.AppDataDirectory, "game_data.db");
-        EnsureSampleDatabaseExists();
+        //_dbPath = Path.Combine(FileSystem.AppDataDirectory, "game_data.db");
+        //EnsureSampleDatabaseExists();
     }
 
     public string GetDatabasePath() => _dbPath;
@@ -297,7 +298,7 @@ public class SqliteDataService
         }
         catch
         {
-            // Fail silently on transient/partial key validation errors during typing
+            Debug.WriteLine("Error recalculating generated fields. Ensure the database schema supports the provided inputs.");
         }
 
         return generatedValues;

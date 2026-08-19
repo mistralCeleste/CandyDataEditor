@@ -1,0 +1,18 @@
+﻿@* Components/LigatureSettingsTab.razor *@
+<div class="p-2">
+    <h6>🔤 Game Icon & Ligature Settings</h6>
+    <p class="text-muted small">Configure font ligatures (e.g., <code>[place]</code> → <span class="game-icon-ligature">[place]</span>, <code>[defense]</code> → <span class="game-icon-ligature">[defense]</span>) for TipTap editor previewing.</p>
+
+    <div class="mb-3">
+        <button class="btn btn-sm btn-outline-primary" @onclick="AutoDetectFontLigaturesAsync">
+            🔍 Auto-Detect Font Icons & Ligatures
+        </button>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-body-tertiary fw-bold py-1 fs-7">Available Game Icons & Ligatures</div>
+        <div class="card-body">
+            <GameIconPickerPane MaxHeight="250px" OnIconSelected="OnIconSelectedFromPane" />
+        </div>
+    </div>
+</div>

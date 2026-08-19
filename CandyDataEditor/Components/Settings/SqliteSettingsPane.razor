@@ -1,0 +1,22 @@
+﻿@* Components/SqliteSettingsPane.razor *@
+<div class="p-2">
+    <h6>🗄️ Database Query & Field Thresholds</h6>
+    <div class="row g-3 mt-1">
+        <div class="col-md-6">
+            <label class="form-label small fw-bold">Query Row Limit</label>
+            <input type="number" class="form-control form-control-sm" @bind="DbService.Config.QueryRowLimit" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-bold">Small Field Threshold (Chars)</label>
+            <input type="number" class="form-control form-control-sm" @bind="DbService.Config.SmallCharThreshold" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-bold">Medium Field Threshold (Chars)</label>
+            <input type="number" class="form-control form-control-sm" @bind="DbService.Config.MediumCharThreshold" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-bold">Large Field Threshold (Chars)</label>
+            <input type="number" class="form-control form-control-sm" @bind="DbService.Config.LargeCharThreshold" />
+        </div>
+    </div>
+</div>

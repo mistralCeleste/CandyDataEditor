@@ -249,3 +249,10 @@ h1:focus {
     cursor: pointer;
 }
 
+.bg-light-gray {
+    background-color: #e9ecef !important;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}

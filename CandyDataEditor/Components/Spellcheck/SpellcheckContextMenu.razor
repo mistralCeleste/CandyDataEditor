@@ -1,0 +1,28 @@
+﻿@* Components/SpellcheckContextMenu.razor *@
+@namespace CandyDataEditor.Components.Spellcheck
+
+@if (IsVisible)
+{
+    <div class="dropdown-menu show shadow-lg position-absolute z-3"
+         style="top: @(Y)px; left: @(X)px; min-width: 180px;">
+        <h6 class="dropdown-header text-danger">Misspelled: "@Word"</h6>
+
+        @if (Suggestions != null && Suggestions.Any())
+        {
+            <div class="dropdown-divider"></div>
+            <small class="dropdown-header text-muted">Suggestions:</small>
+            @foreach (var suggestion in Suggestions)
+            {
+                <button type="button" class="dropdown-item fw-bold text-primary"
+                        @onclick="() => ReplaceWordAsync(suggestion)">
+                    💡 @suggestion
+                </button>
+            }
+        }
+
+        <div class="dropdown-divider"></div>
+        <button type="button" class="dropdown-item text-success" @onclick="AddToDictionaryAsync">
+            ➕ Add "@Word" to Dictionary
+        </button>
+    </div>
+}

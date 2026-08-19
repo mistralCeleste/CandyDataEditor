@@ -1,0 +1,24 @@
+@* Components/GameIconPickerModal.razor *@
+@namespace CandyDataEditor.Components.Fonts
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 3100;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title">Select Game Icon</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModalAsync"></button>
+                </div>
+
+                <div class="modal-body">
+                    <GameIconPickerPane SearchTerm="@SearchTerm" OnIconSelected="SelectIconAsync" />
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModalAsync">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

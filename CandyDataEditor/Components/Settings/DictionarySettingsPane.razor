@@ -1,0 +1,147 @@
+﻿@* Components/DictionarySettingsPane.razor *@
+<div class="p-2">
+    <!-- HEADER & DIRECTORY ACTION -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+        <div class="overflow-hidden">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h6 class="mb-0">📖 Loaded Dictionaries & Vocabulary</h6>
+
+                @* GLOBAL STATUS BADGE *@
+                @if (isLoading)
+                {
+                    <span class="badge bg-secondary text-light">
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        Loading Dictionaries...
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle me-1"></i>Ready: @activeDictionaryWords.Count.ToString("N0") words active
+                    </span>
+                }
+            </div>
+            <div class="text-muted small text-break p-2 bg-body-tertiary font-monospace">
+                <strong>Directory:</strong> <code>@dictDirectoryPath</code>
+            </div>
+        </div>
+        <button class="btn btn-sm btn-outline-primary align-self-start align-self-sm-center flex-shrink-0"
+                @onclick="OpenDictionaryDirectoryInExplorer"
+                disabled="@isLoading">
+            📂 Open Folder in Explorer
+        </button>
+    </div>
+
+    <!-- LOADED DICTIONARY FILES LIST WITH PER-FILE SPINNERS -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-body-tertiary fw-bold py-1 fs-7">Active Dictionary Files</div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 160px;">
+                <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Filename</th>
+                            <th>Status / Word Count</th>
+                            <th>Path</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (loadedDictFiles.Any())
+                        {
+                            @foreach (var file in loadedDictFiles)
+                            {
+                                <tr>
+                                    <td class="fw-bold">📄 @file.FileName</td>
+                                    <td>
+                                        @if (file.IsLoaded)
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle me-1"></i>@file.WordCount.ToString("N0") words
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary text-light">
+                                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                                Reading...
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-muted small text-truncate" style="max-width: 250px;" title="@file.FullPath">@file.FullPath</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="3" class="text-muted text-center py-2">No dictionary files found in directory.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- WORD MANAGEMENT & SEARCH -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-1 fs-7">
+            <span class="fw-bold">Manage Words (@activeDictionaryWords.Count Total)</span>
+            <div class="d-flex gap-2">
+                <input type="text" class="form-control form-control-sm" placeholder="🔍 Search dictionary..."
+                       @bind="dictSearchQuery" @bind:event="oninput" style="width: 180px;" disabled="@isLoading" />
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- ADD WORD FORM -->
+            <div class="input-group input-group-sm mb-3">
+                <input type="text" class="form-control" placeholder="Enter new custom word..." @bind="newWordInput" @onkeyup="HandleNewWordKeyUp" disabled="@isLoading" />
+                <button class="btn btn-success" type="button" @onclick="AddNewWordAsync" disabled="@isLoading">➕ Add Word</button>
+            </div>
+
+            <!-- FILTERED WORDS TABLE -->
+            <div class="table-responsive" style="max-height: 220px;">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Word</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (isLoading && !FilteredDictionaryWords.Any())
+                        {
+                            <tr>
+                                <td colspan="2" class="text-center text-muted py-3">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading words...
+                                </td>
+                            </tr>
+                        }
+                        else if (FilteredDictionaryWords.Any())
+                        {
+                            @foreach (var word in FilteredDictionaryWords.Take(100))
+                            {
+                                <tr>
+                                    <td><code>@word</code></td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger py-0 px-2" title="Remove Word" @onclick="() => RemoveWordAsync(word)">
+                                            🗑️
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="2" class="text-center text-muted py-3">No matching words found.</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (FilteredDictionaryWords.Count() > 100)
+            {
+                <div class="text-muted fs-8 mt-1 text-end">Showing first 100 results...</div>
+            }
+        </div>
+    </div>
+</div>

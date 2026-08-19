@@ -1,0 +1,65 @@
+﻿@using CandyDataEditor.Services
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block bg-dark bg-opacity-50" tabindex="-1" style="z-index: 3000;">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h5 class="modal-title fw-bold">⚙️ Configuration & Settings</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModalAsync"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link @(activeTab == "ligature" ? "active fw-bold" : "")"
+                                    @onclick='() => SetTabAsync("ligature")'>
+                                🔤 Font Ligatures
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(activeTab == "dictionary" ? "active fw-bold" : "")"
+                                    @onclick='() => SetTabAsync("dictionary")'>
+                                📖 Dictionaries
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(activeTab == "editor" ? "active fw-bold" : "")"
+                                    @onclick='() => SetTabAsync("editor")'>
+                                🗄️ SQLite Config
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(activeTab == "ui" ? "active fw-bold" : "")"
+                                    @onclick='() => SetTabAsync("ui")'>
+                                🎨 UI & Appearance
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Render Routing -->
+                    @if (activeTab == "ligature")
+                    {
+                        <LigatureSettingsPane />
+                    }
+                    else if (activeTab == "editor")
+                    {
+                        <SqliteSettingsPane />
+                    }
+                    else if (activeTab == "ui")
+                    {
+                        <AppearanceSettingsPane />
+                    }
+                    else if (activeTab == "dictionary")
+                    {
+                        <DictionarySettingsPane />
+                    }
+                </div>
+                <div class="modal-footer py-2">
+                    <button class="btn btn-sm btn-secondary" @onclick="CloseModalAsync">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

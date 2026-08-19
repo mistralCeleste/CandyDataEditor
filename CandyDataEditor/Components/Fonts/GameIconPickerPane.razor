@@ -1,0 +1,27 @@
+@* Components/GameIconPickerPane.razor *@
+@namespace CandyDataEditor.Components.Fonts
+
+<div class="game-icon-picker-pane">
+    <div class="mb-3">
+        <input type="text" class="form-control" placeholder="Search icon name..."
+               @bind="searchTerm" @bind:event="oninput" autofocus />
+    </div>
+
+    <div class="icon-grid-container border rounded p-2 bg-light" style="max-height: @MaxHeight; overflow-y: auto;">
+        <div class="d-grid gap-2" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));">
+            @foreach (var icon in FilteredIcons)
+            {
+                <button type="button" class="btn btn-white border d-flex flex-column align-items-center p-2 icon-card"
+                        @onclick='(() => SelectIconAsync(icon))'>
+                    <span class="game-icon-preview fs-2 mb-1">[@icon]</span>
+                    <span class="text-muted small text-truncate w-100 text-center">@icon</span>
+                </button>
+            }
+        </div>
+
+        @if (!FilteredIcons.Any())
+        {
+            <div class="text-center text-muted py-4">No icons found matching "@searchTerm"</div>
+        }
+    </div>
+</div>

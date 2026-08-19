@@ -1,0 +1,11 @@
+﻿@* Components/AppearanceSettingsPane.razor *@
+<div class="p-2">
+    <h6>🎨 Theme & Appearance</h6>
+    <div class="mb-3 mt-2">
+        <label class="form-label small fw-bold">Theme Mode</label>
+        <div class="btn-group w-100">
+            <button class="btn btn-outline-light @(!isDarkMode ? "active" : "")" @onclick="() => ToggleThemeAsync(false)">☀️ Light Mode</button>
+            <button class="btn btn-outline-dark @(isDarkMode ? "active" : "")" @onclick="() => ToggleThemeAsync(true)">🌙 Dark Mode</button>
+        </div>
+    </div>
+</div>

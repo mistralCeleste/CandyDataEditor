@@ -22,23 +22,8 @@ namespace CandyDataEditor
 
                 try
                 {
-                    // 1. Enable native right-click context menu for spellcheck
                     nativeWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-
-                    // 2. Ensure CoreWebView2 is initialized
                     await nativeWebView.EnsureCoreWebView2Async();
-
-                    // 3. Register custom game dictionary words with native spellchecker
-                    var customWords = new[] {
-                        "allfoes", "card10clubs", "warblade", "aegis", "d2020", "repeat2"
-                    };
-
-                    foreach (var word in customWords)
-                    {
-                        await nativeWebView.CoreWebView2.ExecuteScriptAsync(
-                            $"window.navigator.spellcheck?.addWord?.('{word}')"
-                        );
-                    }
                 }
                 catch (Exception ex)
                 {

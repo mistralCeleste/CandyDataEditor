@@ -36,9 +36,9 @@ public class GameDictionaryService
     }
 
     /// <summary>
-    /// Scans, copies missing bundled dictionaries, and returns all active combined words.
+    /// Asynchronously scans, copies missing bundled dictionaries, and reads all words with per-file status reporting.
     /// </summary>
-    public async Task<List<string>> SyncAndLoadAllDictionariesAsync()
+    public async Task<List<string>> SyncAndLoadAllDictionariesAsync(Action<string, bool, int>? onFileProcessed = null)
     {
         return await Task.Run(async () =>
         {
@@ -69,7 +69,11 @@ public class GameDictionaryService
 
                 foreach (var filePath in allLocalTxtFiles)
                 {
+                    string fileName = Path.GetFileName(filePath);
+                    onFileProcessed?.Invoke(fileName, false, 0);
+
                     var lines = await File.ReadAllLinesAsync(filePath, System.Text.Encoding.UTF8);
+                    int fileWordCount = 0;
 
                     foreach (var line in lines)
                     {
@@ -77,8 +81,11 @@ public class GameDictionaryService
                         if (!string.IsNullOrWhiteSpace(word) && !word.StartsWith("#"))
                         {
                             allWords.Add(word);
+                            fileWordCount++;
                         }
                     }
+
+                    onFileProcessed?.Invoke(fileName, true, fileWordCount);
                 }
             }
             catch (Exception ex)

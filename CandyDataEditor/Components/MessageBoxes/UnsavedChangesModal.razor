@@ -1,0 +1,21 @@
+﻿@namespace CandyDataEditor.Components.MessageBoxes
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block tab-index-1 bg-dark bg-opacity-50" tabindex="-1" style="z-index: 3200;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold">⚠️ Unsaved Changes</h5>
+                </div>
+                <div class="modal-body">
+                    You have modified fields in this record without saving. What would you like to do?
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="DiscardAsync">Discard Changes</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync">Save & Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
