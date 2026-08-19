@@ -44,6 +44,7 @@
         <PackageIcon>Candy.ico</PackageIcon>
         <RepositoryUrl>https://github.com/mistralCeleste/CandyDataEditor</RepositoryUrl>
         <DefaultLanguage>en</DefaultLanguage>
+        <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     </PropertyGroup>
 
 	<PropertyGroup Condition="$(TargetFramework.Contains('-windows'))">
@@ -96,5 +97,7 @@
 
 		<Message Text="[TipTap Build] Updated tiptap-bundle.js successfully." Importance="high" />
 	</Target>
+	<Import Project="..\extern\Typography\Typography.GlyphLayout\Typography.GlyphLayout.projitems" Label="Shared" />
+	<Import Project="..\extern\Typography\Typography.OpenFont\Typography.OpenFont.projitems" Label="Shared" />
 
 </Project>

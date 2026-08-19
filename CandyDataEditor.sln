@@ -10,6 +10,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CandyDataEditor", "CandyDat
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "TipTap", "TipTap\TipTap.esproj", "{AC8BD46C-A794-1AD4-B447-B5AEBA8C1A4B}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Typography.OpenFont", "extern\Typography\Typography.OpenFont\Typography.OpenFont.shproj", "{235A071B-8D06-40AE-A5C5-B1CE59715EE9}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Typography.GlyphLayout", "extern\Typography\Typography.GlyphLayout\Typography.GlyphLayout.shproj", "{D8861CF8-C506-472B-8A57-632BD6CA6496}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,5 +52,11 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F062FBD5-47A5-46FA-BB36-C3D628060F15}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		extern\Typography\Typography.OpenFont\Typography.OpenFont.projitems*{235a071b-8d06-40ae-a5c5-b1ce59715ee9}*SharedItemsImports = 13
+		extern\Typography\Typography.GlyphLayout\Typography.GlyphLayout.projitems*{2f9eecb5-1fa7-4348-8ca8-c319010e3e11}*SharedItemsImports = 5
+		extern\Typography\Typography.OpenFont\Typography.OpenFont.projitems*{2f9eecb5-1fa7-4348-8ca8-c319010e3e11}*SharedItemsImports = 5
+		extern\Typography\Typography.GlyphLayout\Typography.GlyphLayout.projitems*{d8861cf8-c506-472b-8a57-632bd6ca6496}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

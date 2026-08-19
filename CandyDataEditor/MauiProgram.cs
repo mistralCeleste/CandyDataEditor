@@ -22,6 +22,7 @@ namespace CandyDataEditor
             builder.Services.AddSingleton<SqliteEditorConfig>();
             builder.Services.AddSingleton<SqliteDataService>();
             builder.Services.AddSingleton<FileDialogService>();
+            builder.Services.AddSingleton<FontLigatureService>();
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();

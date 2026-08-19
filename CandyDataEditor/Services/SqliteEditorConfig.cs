@@ -15,6 +15,7 @@ public class SqliteEditorConfig
     private const bool DefaultIsDarkMode = false;
     private const int MaxRecentDatabases = 5;
 
+
     public SqliteEditorConfig()
     {
         // Load settings from persistent storage on startup
