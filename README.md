@@ -51,6 +51,7 @@ CandyDataEditor.sln
 * **.NET 8.0 SDK**
 * **Node.js** (v18+) & **npm** (installed globally for `esbuild` bundling)
 * **Visual Studio 2022**
+* **https://github.com/LayoutFarm/Typography** (used for ligature scanning)
 
 ### Setup & Run
 
@@ -81,3 +82,8 @@ Spellcheck dictionaries reside in the application's bundled dictionaries directo
 2. Add or remove custom terms (saved to `custom_user_words.txt`).
 3. Click **Open Folder in Explorer** to add external `.txt` vocabulary files directly.
 
+
+
+## 🔤 Game Icon Font Ligatures
+
+Supports custom ligatures from fonts, from my included font, I put my icons in the FeatureTable named 'icon', which is built using FontForge, SVGs, and an open-source serif font as a base.  The font can be loaded into the app, scanned, and either used by simply typing, or selecting the glyph from a menu.
