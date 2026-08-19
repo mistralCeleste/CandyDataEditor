@@ -1,9 +1,25 @@
-@* Components/GameIconPickerPane.razor *@
+﻿@* Components/GameIconPickerPane.razor *@
 @namespace CandyDataEditor.Components.Fonts
 
 <div class="game-icon-picker-pane">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="small text-muted fw-bold">Available Icons (@FilteredIcons.Count)</span>
+        @if (Config?.DetectedLigatures != null && Config.DetectedLigatures.Any())
+        {
+            <span class="badge bg-success-subtle text-success border border-success-subtle" title="Active font: @Config.FontFilePath">
+                📁 Scanned Font (@Config.DetectedLigatures.Count)
+            </span>
+        }
+        else
+        {
+            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="Configure a font file in settings to load custom ligatures">
+                Default Set
+            </span>
+        }
+    </div>
+
     <div class="mb-3">
-        <input type="text" class="form-control" placeholder="Search icon name..."
+        <input type="text" class="form-control form-control-sm" placeholder="Search icon name..."
                @bind="searchTerm" @bind:event="oninput" autofocus />
     </div>
 
@@ -21,7 +37,7 @@
 
         @if (!FilteredIcons.Any())
         {
-            <div class="text-center text-muted py-4">No icons found matching "@searchTerm"</div>
+            <div class="text-center text-muted py-4 small">No icons found matching "@searchTerm"</div>
         }
     </div>
 </div>

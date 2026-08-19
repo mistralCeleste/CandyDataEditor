@@ -15,6 +15,9 @@ public class SqliteEditorConfig
     private const bool DefaultIsDarkMode = false;
     private const int MaxRecentDatabases = 5;
 
+    // Font Defaults
+    private const string DefaultFontFilePath = "";
+    private const string DefaultFontFeatureTable = "liga";
 
     public SqliteEditorConfig()
     {
@@ -24,6 +27,9 @@ public class SqliteEditorConfig
         MediumCharThreshold = GetStoredValue(nameof(MediumCharThreshold), DefaultMediumCharThreshold);
         LargeCharThreshold = GetStoredValue(nameof(LargeCharThreshold), DefaultLargeCharThreshold);
         IsDarkMode = GetStoredValue(nameof(IsDarkMode), DefaultIsDarkMode);
+
+        FontFilePath = GetStoredValue(nameof(FontFilePath), DefaultFontFilePath);
+        FontFeatureTable = GetStoredValue(nameof(FontFeatureTable), DefaultFontFeatureTable);
     }
 
     public int QueryRowLimit
@@ -56,28 +62,40 @@ public class SqliteEditorConfig
         set => SetStoredValue(nameof(IsDarkMode), value);
     }
 
+    // --- FONT & LIGATURE SETTINGS ---
+
+    public string FontFilePath
+    {
+        get => GetStoredValue(nameof(FontFilePath), DefaultFontFilePath);
+        set => SetStoredValue(nameof(FontFilePath), value);
+    }
+
+    public string FontFeatureTable
+    {
+        get => GetStoredValue(nameof(FontFeatureTable), DefaultFontFeatureTable);
+        set => SetStoredValue(nameof(FontFeatureTable), value);
+    }
+
+    public List<string> DetectedLigatures
+    {
+        get => GetStoredList(nameof(DetectedLigatures));
+        set => SetStoredList(nameof(DetectedLigatures), value);
+    }
+
     public List<string> RecentDatabases
     {
         get => GetStoredList(nameof(RecentDatabases));
         private set => SetStoredList(nameof(RecentDatabases), value);
     }
 
-    /// <summary>
-    /// Adds a database path to the top of the recent list, removes duplicates, and caps at 5 entries.
-    /// </summary>
     public void AddRecentDatabase(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
 
         var list = RecentDatabases;
-
-        // Case-insensitive removal of existing entry to avoid duplicates
         list.RemoveAll(p => p.Equals(path, StringComparison.OrdinalIgnoreCase));
-
-        // Insert at the top
         list.Insert(0, path);
 
-        // Cap to most recent
         if (list.Count > MaxRecentDatabases)
         {
             list = list.Take(MaxRecentDatabases).ToList();
@@ -86,9 +104,6 @@ public class SqliteEditorConfig
         RecentDatabases = list;
     }
 
-    /// <summary>
-    /// Removes a file path if it no longer exists on disk or was deleted.
-    /// </summary>
     public void RemoveRecentDatabase(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
@@ -100,9 +115,6 @@ public class SqliteEditorConfig
         }
     }
 
-    /// <summary>
-    /// Calculates how many lines of editor height to assign a string based on character thresholds.
-    /// </summary>
     public int GetLineCountForText(string text)
     {
         if (string.IsNullOrEmpty(text)) return 3;
@@ -123,6 +135,11 @@ public class SqliteEditorConfig
     }
 
     private bool GetStoredValue(string key, bool defaultValue)
+    {
+        return Preferences.Default.Get(key, defaultValue);
+    }
+
+    private string GetStoredValue(string key, string defaultValue)
     {
         return Preferences.Default.Get(key, defaultValue);
     }
