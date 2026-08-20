@@ -24147,7 +24147,7 @@ ${prefix}
   var redoNoScroll = buildCommand(true, false);
 
   // node_modules/@tiptap/extensions/dist/index.js
-  var CharacterCount2 = Extension.create({
+  var CharacterCount = Extension.create({
     name: "characterCount",
     addOptions() {
       return {
@@ -24652,7 +24652,7 @@ ${prefix}
       }
     });
   }
-  var Placeholder2 = Extension.create({
+  var Placeholder = Extension.create({
     name: "placeholder",
     addOptions() {
       return {
@@ -32210,7 +32210,7 @@ ${element.innerHTML}
   });
 
   // tiptap-entry.js
-  var Markdown2 = Markdown || void 0 || tiptap_markdown_es_exports;
+  var MarkdownExtension = Markdown || void 0 || tiptap_markdown_es_exports;
   window.DEBUG_SPELLCHECK = true;
   var LIGATURE_REGEX = /\[[a-zA-Z0-9_-]+\]|->|<-|--/g;
   var WORD_REGEX = /[\p{L}0-9_']+/gu;
@@ -32221,20 +32221,12 @@ ${element.innerHTML}
         new Plugin({
           key: new PluginKey("nativeCustomSpellchecker"),
           props: {
-            // In tiptap-entry.js inside NativeCustomSpellchecker:
             decorations(state) {
-              debugLog("\u{1F50D} [Spellchecker Plugin] Running decorations pass...");
               const spellchecker = window.spellchecker;
               let allowedSet = spellchecker && spellchecker.globalGameWords instanceof Set ? spellchecker.globalGameWords : window.activeGameWords;
               const allowedSize = allowedSet ? allowedSet.size : 0;
-              debugLog(`\u{1F4E6} [Spellchecker Plugin] Active Dictionary Size: ${allowedSize}`);
-              if (!allowedSet || allowedSize === 0) {
-                debugWarn("\u26A0\uFE0F [Spellchecker Plugin] Dictionary is empty or missing! Skipping scan.");
-                return DecorationSet.empty;
-              }
+              if (!allowedSet || allowedSize === 0) return DecorationSet.empty;
               const decorations = [];
-              let wordsScanned = 0;
-              let misspellingsFound = 0;
               state.doc.descendants((node, pos) => {
                 if (!node.isText || !node.text) return;
                 const ligatureRanges = [];
@@ -32257,12 +32249,9 @@ ${element.innerHTML}
                     (range) => wordStart >= range.start && wordEnd <= range.end
                   );
                   if (isInsideLigature) continue;
-                  wordsScanned++;
                   const lower = word.replace(/[\u200B-\u200D\uFEFF]/g, "").toLowerCase().trim();
                   const isKnown = allowedSet.has(lower);
                   if (!isKnown) {
-                    misspellingsFound++;
-                    debugLog(`\u274C [Misspelled Word Flagged]: "${word}" (Normalized: "${lower}")`);
                     decorations.push(
                       Decoration.inline(pos + wordStart, pos + wordEnd, {
                         class: "custom-misspelled-word",
@@ -32272,7 +32261,6 @@ ${element.innerHTML}
                   }
                 }
               });
-              debugLog(`\u2705 [Spellchecker Summary] Scanned: ${wordsScanned} words | Misspelled: ${misspellingsFound} | Applied Decorations: ${decorations.length}`);
               return DecorationSet.create(state.doc, decorations);
             }
           }
@@ -32298,9 +32286,7 @@ ${element.innerHTML}
                     const start = pos + match2.index;
                     const end = start + match2[0].length;
                     decorations.push(
-                      Decoration.inline(start, end, {
-                        class: "game-icon-ligature"
-                      })
+                      Decoration.inline(start, end, { class: "game-icon-ligature" })
                     );
                   }
                 }
@@ -32315,33 +32301,19 @@ ${element.innerHTML}
   var KeywordMark = Mark2.create({
     name: "keyword",
     addOptions() {
-      return {
-        HTMLAttributes: {
-          class: "keyword-mark"
-        }
-      };
+      return { HTMLAttributes: { class: "keyword-mark" } };
     },
     parseHTML() {
-      return [
-        { tag: "span.keyword-mark" },
-        { tag: "mark" }
-      ];
+      return [{ tag: "span.keyword-mark" }, { tag: "mark" }];
     },
     renderHTML({ HTMLAttributes }) {
       return ["span", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
     },
-    // Registers editor.chain().focus().toggleKeyword() and setKeyword()
     addCommands() {
       return {
-        setKeyword: () => ({ commands }) => {
-          return commands.setMark(this.name);
-        },
-        toggleKeyword: () => ({ commands }) => {
-          return commands.toggleMark(this.name);
-        },
-        unsetKeyword: () => ({ commands }) => {
-          return commands.unsetMark(this.name);
-        }
+        setKeyword: () => ({ commands }) => commands.setMark(this.name),
+        toggleKeyword: () => ({ commands }) => commands.toggleMark(this.name),
+        unsetKeyword: () => ({ commands }) => commands.unsetMark(this.name)
       };
     },
     addInputRules() {
@@ -32367,9 +32339,7 @@ ${element.innerHTML}
     content: "inline*",
     defining: true,
     addAttributes() {
-      return {
-        level: { default: 1 }
-      };
+      return { level: { default: 1 } };
     },
     parseHTML() {
       return [
@@ -32384,23 +32354,17 @@ ${element.innerHTML}
     },
     addCommands() {
       return {
-        setActionHeading: (attributes) => ({ commands }) => {
-          return commands.setNode(this.name, attributes);
-        },
-        toggleActionHeading: (attributes) => ({ commands }) => {
-          return commands.toggleNode(this.name, "paragraph", attributes);
-        }
+        setActionHeading: (attributes) => ({ commands }) => commands.setNode(this.name, attributes),
+        toggleActionHeading: (attributes) => ({ commands }) => commands.toggleNode(this.name, "paragraph", attributes)
       };
     },
     addInputRules() {
       return [
-        // Matches "@@ " at start of line for Sub-Action
         textblockTypeInputRule({
           find: /^@@\s$/,
           type: this.type,
           getAttributes: () => ({ level: 2 })
         }),
-        // Matches "@ " at start of line for Main Action
         textblockTypeInputRule({
           find: /^@\s$/,
           type: this.type,
@@ -32465,112 +32429,49 @@ ${element.innerHTML}
       ];
     }
   });
-  var TildeList = Extension.create({
-    name: "tildeList",
+  var DashList = Extension.create({
+    name: "dashList",
     addInputRules() {
       return [
-        // Triggers when typing "~ " at the start of a line
         wrappingInputRule({
-          find: /^~\s$/,
+          find: /^[-*]\s$/,
           type: this.editor.schema.nodes.bulletList
         })
       ];
     }
   });
-  var GameDictionary = Extension.create({
-    name: "gameDictionary",
-    addOptions() {
-      return {
-        words: []
-      };
-    },
+  var RawMarkdownPasteHandler = Extension.create({
+    name: "rawMarkdownPasteHandler",
     addProseMirrorPlugins() {
-      const extension = this;
       return [
         new Plugin({
-          key: new PluginKey("gameDictionary"),
+          key: new PluginKey("rawMarkdownPasteHandler"),
           props: {
-            decorations(state) {
-              const words = extension.options.words;
-              if (!words || words.length === 0) return DecorationSet.empty;
-              const decorations = [];
-              const cleanWords = words.filter((w) => typeof w === "string" && w.trim().length > 0).map((w) => w.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-              if (cleanWords.length === 0) return DecorationSet.empty;
-              const regex = new RegExp(`\\b(${cleanWords.join("|")})\\b`, "gi");
-              state.doc.descendants((node, pos) => {
-                if (node.isText && node.text) {
-                  let match2;
-                  regex.lastIndex = 0;
-                  while ((match2 = regex.exec(node.text)) !== null) {
-                    const start = pos + match2.index;
-                    const end = start + match2[0].length;
-                    decorations.push(
-                      Decoration.inline(start, end, {
-                        spellcheck: "false",
-                        style: "spellcheck: false !important;",
-                        class: "custom-game-word"
-                      })
-                    );
-                  }
-                }
-              });
-              return DecorationSet.create(state.doc, decorations);
+            transformPastedText(text2) {
+              return text2.replace(/\\([#\-*@_>])/g, "$1").replace(/\\\[([a-zA-Z0-9_-]+)\\\]/g, "[$1]");
             }
           }
         })
       ];
     }
   });
-  window.execTipTapCommand = function(elementId, commandName, value) {
-    const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
-    if (!editor) return;
-    switch (commandName) {
-      case "toggleList":
-        editor.chain().focus().toggleBulletList().run();
-        break;
-      case "keyword":
-        editor.chain().focus().toggleMark("keyword").run();
-        break;
-      case "bold":
-        editor.chain().focus().toggleBold().run();
-        break;
-      case "italic":
-        editor.chain().focus().toggleItalic().run();
-        break;
-      case "actionParent":
-        editor.chain().focus().toggleActionHeading({ level: 1 }).run();
-        break;
-      case "actionChild":
-        editor.chain().focus().toggleActionHeading({ level: 2 }).run();
-        break;
-      case "undo":
-        editor.chain().focus().undo().run();
-        break;
-      case "redo":
-        editor.chain().focus().redo().run();
-        break;
-      case "insertIcon":
-        editor.chain().focus().insertContent(`[${value}]`).run();
-        break;
-    }
-  };
   function createEditor(elementId, initialContent, dotnetRef, initialDictionary) {
     const editor = new Editor({
       element: document.getElementById(elementId),
       content: initialContent,
       extensions: [
         index_default,
-        Placeholder.configure({ placeholder: "Start typing\u2026" }),
-        CharacterCount,
-        SpellcheckerExtension.configure({
-          dictionary: initialDictionary,
-          // array of words
-          underlineColor: "#ff0000",
-          spellcheckOnLoad: true,
-          onMisspelled: (word) => {
-            dotnetRef.invokeMethodAsync("OnMisspelledWord", word);
-          }
-        })
+        MarkdownExtension.configure({
+          html: true,
+          transformPastedText: true,
+          transformCopiedText: true
+        }),
+        KeywordMark,
+        ActionHeading,
+        DashList,
+        RawMarkdownPasteHandler,
+        GameIconDecoration,
+        NativeCustomSpellchecker
       ],
       onUpdate({ editor: editor2 }) {
         const html = editor2.getHTML();
@@ -32581,25 +32482,15 @@ ${element.innerHTML}
     editor.storage.spellcheckerDictionary = initialDictionary;
     return editor;
   }
-  function debugLog(message, ...args) {
-    if (window.DEBUG_SPELLCHECK) {
-      console.log(message, ...args);
-    }
-  }
-  function debugWarn(message, ...args) {
-    if (window.DEBUG_SPELLCHECK) {
-      console.warn(message, ...args);
-    }
-  }
   window.TipTap = {
     Editor,
     StarterKit: index_default,
-    Markdown: Markdown2,
-    GameDictionary,
-    GameIconDecoration,
+    Markdown: MarkdownExtension,
     KeywordMark,
     ActionHeading,
-    TildeList,
+    DashList,
+    RawMarkdownPasteHandler,
+    GameIconDecoration,
     NativeCustomSpellchecker
   };
 })();

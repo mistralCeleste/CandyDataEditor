@@ -85,11 +85,6 @@ namespace CandyDataEditor.Components.Settings
             await JSRuntime.InvokeVoidAsync("document.body.setAttribute", "data-bs-theme", dark ? "dark" : "light");
         }
 
-        protected async Task AutoDetectFontLigatures()
-        {
-            await JSRuntime.InvokeVoidAsync("alert", "Font ligatures scanned and updated!");
-        }
-
         protected async Task RefreshDictionaryStateAsync()
         {
             dictDirectoryPath = DictionaryService.GetLocalDictionariesFolder();

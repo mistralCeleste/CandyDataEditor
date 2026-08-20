@@ -114,3 +114,8 @@
 
 <!-- SETTINGS MODAL DIALOG -->
 <SettingsDialog @bind-IsOpen="isSettingsOpen" DefaultTab="@activeSettingsTab" />
+
+<!-- MESSAGE BOX DIALOG -->
+<MessageBox @bind-IsOpen="showMessageBox"
+            Title="@messageBoxTitle"
+            Message="@messageBoxMessage" />

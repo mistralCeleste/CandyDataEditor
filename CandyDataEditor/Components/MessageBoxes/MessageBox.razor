@@ -1,0 +1,33 @@
+@namespace CandyDataEditor.Components.MessageBoxes
+@using System.Text.RegularExpressions
+
+@if (IsOpen)
+{
+    <div class="messagebox-backdrop" @onclick="HandleBackdropClick">
+        <div class="messagebox-container" @onclick:stopPropagation="true">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <div class="messagebox-header">
+                    <h3>@Title</h3>
+                    <button type="button" class="messagebox-close-btn" @onclick="CloseAsync">&times;</button>
+                </div>
+            }
+
+            <div class="messagebox-body">
+                @RenderFormattedMessage()
+            </div>
+
+            <div class="messagebox-footer">
+                @if (Type == MessageBoxType.Confirm)
+                {
+                    <button type="button" class="btn btn-secondary" @onclick="CancelAsync">@CancelButtonText</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmAsync">@OkButtonText</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-primary" @onclick="CloseAsync">@OkButtonText</button>
+                }
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,41 @@
+<!--
+  Simple Alert with File Path Link
+-->
+
+<MessageBox @bind-IsOpen="_showAlert" 
+            Title="Export Complete" 
+            Message="@_alertMessage" />
+
+@code {
+    private bool _showAlert = false;
+    private string _alertMessage = "";
+
+    private void OnFontGenerated()
+    {
+        _alertMessage = "Font successfully built! File located at D:\\git\\LigatureIconGenerator\\fontTest\\GameIcons-Regular.ttf";
+        _showAlert = true;
+    }
+}
+
+
+<!--
+  Confirm dialog
+-->
+
+<MessageBox @bind-IsOpen="_showConfirm" 
+            Title="Delete File" 
+            Type="MessageBoxType.Confirm"
+            Message="Are you sure you want to clean target folder D:\git\LigatureIconGenerator\output?" 
+            OnResult="HandleConfirmResult" />
+
+@code {
+    private bool _showConfirm = false;
+
+    private void HandleConfirmResult(bool confirmed)
+    {
+        if (confirmed)
+        {
+            // Execute action
+        }
+    }
+}

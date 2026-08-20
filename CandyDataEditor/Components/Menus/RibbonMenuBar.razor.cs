@@ -9,6 +9,18 @@ namespace CandyDataEditor.Components.Menus
         private string exportScope = "all";
         private bool isSettingsOpen = false;
 
+        // MessageBox controls
+        private bool showMessageBox = false;
+        private string messageBoxTitle = "Notification";
+        private string messageBoxMessage = string.Empty;
+
+        private void ShowMessageBox(string title, string message)
+        {
+            messageBoxTitle = title;
+            messageBoxMessage = message;
+            showMessageBox = true;
+        }
+
         private void OpenSettings(string tabName)
         {
             activeSettingsTab = tabName;
@@ -57,7 +69,7 @@ namespace CandyDataEditor.Components.Menus
 
             if (!string.IsNullOrWhiteSpace(savedPath))
             {
-                await JSRuntime.InvokeVoidAsync("alert", $"Database copy saved successfully to:\n{savedPath}");
+                ShowMessageBox("Database Saved", $"Database copy saved successfully to:\n{savedPath}");
             }
         }
 
@@ -78,6 +90,7 @@ namespace CandyDataEditor.Components.Menus
             else
             {
                 DbService.Config.RemoveRecentDatabase(path);
+                ShowMessageBox("File Not Found", $"The selected database file no longer exists:\n{path}");
             }
         }
 
@@ -103,12 +116,12 @@ namespace CandyDataEditor.Components.Menus
             if (format == "html-cards")
             {
                 await DbService.ExportHtmlCardsBundleAsync(filtered, exportFolder);
-                await JSRuntime.InvokeVoidAsync("alert", $"HTML Cards Bundle exported to:\n{exportFolder}");
+                ShowMessageBox("Export Complete", $"HTML Cards Bundle exported to:\n{exportFolder}");
             }
             else
             {
                 await DbService.ExportDataFilesAsync(filtered, format, exportFolder);
-                await JSRuntime.InvokeVoidAsync("alert", $"Exported {filtered.Count} object(s) in {format.ToUpper()} format to:\n{exportFolder}");
+                ShowMessageBox("Export Complete", $"Exported {filtered.Count} object(s) in {format.ToUpper()} format to:\n{exportFolder}");
             }
         }
 
