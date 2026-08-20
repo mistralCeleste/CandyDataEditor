@@ -21,78 +21,81 @@ namespace CandyDataEditor.Services
                 return results.ToList();
 
             // Find target feature table (e.g. "liga")
-            var iconFeature = gsub.FeatureList.featureTables
-                .FirstOrDefault(f => f.TagName.Equals(featureTable, StringComparison.OrdinalIgnoreCase));
+            var iconFeatures = gsub.FeatureList.featureTables
+                .Where(f => f.TagName.Equals(featureTable, StringComparison.OrdinalIgnoreCase));
 
-            if (iconFeature == null)
-                return results.ToList();
-
-            // Pre-build Unicode mapping cache once per scan
-            var glyphToUnicodeMap = GetGlyphToUnicodeMap(typeface);
-
-            foreach (ushort lookupIndex in iconFeature.LookupListIndices)
+            foreach (var iconFeature in iconFeatures)
             {
-                if (lookupIndex >= gsub.LookupList.Count) continue;
+                if (iconFeature == null)
+                    return results.ToList();
 
-                var lookup = gsub.LookupList[lookupIndex];
-                if (lookup?.SubTables == null) continue;
+                // Pre-build Unicode mapping cache once per scan
+                var glyphToUnicodeMap = GetGlyphToUnicodeMap(typeface);
 
-                foreach (var sub in lookup.SubTables)
+                foreach (ushort lookupIndex in iconFeature.LookupListIndices)
                 {
-                    // Access nested LigatureSetTables via reflection on private subtable implementations
-                    var ligSetTablesProp = sub.GetType().GetProperty("LigatureSetTables");
-                    if (ligSetTablesProp?.GetValue(sub) is not Array ligSetTables) continue;
+                    if (lookupIndex >= gsub.LookupList.Count) continue;
 
-                    foreach (var ligSet in ligSetTables)
+                    var lookup = gsub.LookupList[lookupIndex];
+                    if (lookup?.SubTables == null) continue;
+
+                    foreach (var sub in lookup.SubTables)
                     {
-                        var ligaturesProp = ligSet.GetType().GetProperty("Ligatures");
-                        if (ligaturesProp?.GetValue(ligSet) is not Array ligatures) continue;
+                        // Access nested LigatureSetTables via reflection on private subtable implementations
+                        var ligSetTablesProp = sub.GetType().GetProperty("LigatureSetTables");
+                        if (ligSetTablesProp?.GetValue(sub) is not Array ligSetTables) continue;
 
-                        foreach (var lig in ligatures)
+                        foreach (var ligSet in ligSetTables)
                         {
-                            var type = lig.GetType();
-                            var componentGlyphsField = type.GetField("ComponentGlyphs");
-                            var glyphIdField = type.GetField("GlyphId");
+                            var ligaturesProp = ligSet.GetType().GetProperty("Ligatures");
+                            if (ligaturesProp?.GetValue(ligSet) is not Array ligatures) continue;
 
-                            if (componentGlyphsField == null || glyphIdField == null) continue;
-
-                            var componentGlyphs = componentGlyphsField.GetValue(lig) as ushort[];
-                            var glyphId = glyphIdField.GetValue(lig) as ushort?;
-
-                            if (componentGlyphs == null || componentGlyphs.Length == 0 || glyphId == null)
-                                continue;
-
-                            // Trim the trailing 'bracketright' glyph injected by FontForge
-                            ushort[] trimmed = componentGlyphs.Take(componentGlyphs.Length - 1).ToArray();
-                            var parts = new List<char>();
-
-                            foreach (ushort gId in trimmed)
+                            foreach (var lig in ligatures)
                             {
-                                var g = typeface.GetGlyph(gId);
-                                if (g == null || !g.IsCffGlyph) continue;
+                                var type = lig.GetType();
+                                var componentGlyphsField = type.GetField("ComponentGlyphs");
+                                var glyphIdField = type.GetField("GlyphId");
 
-                                var cff = g.GetCff1GlyphData();
-                                if (cff?.Name != null)
+                                if (componentGlyphsField == null || glyphIdField == null) continue;
+
+                                var componentGlyphs = componentGlyphsField.GetValue(lig) as ushort[];
+                                var glyphId = glyphIdField.GetValue(lig) as ushort?;
+
+                                if (componentGlyphs == null || componentGlyphs.Length == 0 || glyphId == null)
+                                    continue;
+
+                                // Trim the trailing 'bracketright' glyph injected by FontForge
+                                ushort[] trimmed = componentGlyphs.Take(componentGlyphs.Length - 1).ToArray();
+                                var parts = new List<char>();
+
+                                foreach (ushort gId in trimmed)
                                 {
-                                    if (cff.Name.Length == 1)
+                                    var g = typeface.GetGlyph(gId);
+                                    if (g == null || !g.IsCffGlyph) continue;
+
+                                    var cff = g.GetCff1GlyphData();
+                                    if (cff?.Name != null)
                                     {
-                                        parts.Add(cff.Name[0]);
-                                    }
-                                    else if (cff.Name.Length > 1)
-                                    {
-                                        // Fallback to cmap unicode code point for substituted word names
-                                        if (glyphToUnicodeMap.TryGetValue(gId, out uint unicodeHex))
+                                        if (cff.Name.Length == 1)
                                         {
-                                            parts.Add((char)unicodeHex);
+                                            parts.Add(cff.Name[0]);
+                                        }
+                                        else if (cff.Name.Length > 1)
+                                        {
+                                            // Fallback to cmap unicode code point for substituted word names
+                                            if (glyphToUnicodeMap.TryGetValue(gId, out uint unicodeHex))
+                                            {
+                                                parts.Add((char)unicodeHex);
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            string ligatureKey = string.Join("", parts);
-                            if (!string.IsNullOrWhiteSpace(ligatureKey))
-                            {
-                                results.Add(ligatureKey);
+                                string ligatureKey = string.Join("", parts);
+                                if (!string.IsNullOrWhiteSpace(ligatureKey))
+                                {
+                                    results.Add(ligatureKey);
+                                }
                             }
                         }
                     }

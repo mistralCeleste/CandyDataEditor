@@ -70,6 +70,11 @@ ScaffoldingReadMe.txt
 # StyleCop
 StyleCopReport.xml
 
+# cert information
+*.cer
+*.pfx
+*.p12
+
 # Files built by Visual Studio
 *_i.c
 *_p.c
@@ -223,6 +228,14 @@ _pkginfo.txt
 *.appx
 *.appxbundle
 *.appxupload
+*.msix
+*.msixbundle
+
+# Publish output
+Publish/
+Installer/
+bin/
+obj/
 
 # Visual Studio cache files
 # files ending in .cache can be ignored
