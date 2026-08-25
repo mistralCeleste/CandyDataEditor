@@ -126,11 +126,13 @@
                                 @foreach (var col in tableData.Columns)
                                 {
                                     var meta = columnMetadata.TryGetValue(col, out var m) ? m : new ColumnMetadata();
+                                    bool isReadOnlyField = meta.IsGenerated || meta.IsReadOnly;
+
                                     string fieldValue = GetFieldValue(col);
                                     int lineCount = DbService.Config.GetLineCountForText(fieldValue);
                                     string fieldHeightStyle = $"min-height: {lineCount * 1.6}rem;";
 
-                                    <div @key="col" class="border rounded p-3 @(meta.IsReadOnly || meta.IsGenerated ? "bg-body-tertiary" : "bg-body")">
+                                    <div @key="col" class="border rounded p-3 @(isReadOnlyField ? "bg-body-tertiary" : "bg-body")">
                                         <label class="form-label fw-bold d-flex justify-content-between align-items-center">
                                             <span>@col</span>
                                             <div>
@@ -149,18 +151,12 @@
                                             </div>
                                         </label>
 
-                                        @if (meta.IsGenerated || meta.IsReadOnly)
-                                        {
-                                            <input type="text" class="form-control" readonly value="@fieldValue" />
-                                        }
-                                        else
-                                        {
-                                            <div style="@fieldHeightStyle">
-                                                <TipTapEditor MarkdownValue="@GetFieldValue(col)"
-                                                              MarkdownValueChanged="(val) => SetFieldValue(col, val)"
-                                                              OnBlur="OnFieldFocusLost" />
-                                            </div>
-                                        }
+                                        <div style="@fieldHeightStyle">
+                                            <TipTapEditor MarkdownValue="@fieldValue"
+                                                          MarkdownValueChanged="(val) => SetFieldValue(col, val)"
+                                                          IsReadOnly="isReadOnlyField"
+                                                          OnBlur="OnFieldFocusLost" />
+                                        </div>
 
                                         @if (fieldErrorMessages.TryGetValue(col, out string? fieldError))
                                         {

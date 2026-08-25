@@ -77,7 +77,14 @@ window.execTipTapCommand = function (elementId, commandName, value) {
     }
 };
 
-window.initTipTap = function (elementId, initialContent, dotnetHelper) {
+window.setTipTapEditable = function (elementId, isEditable) {
+    const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
+    if (!editor) return;
+
+    editor.setEditable(isEditable, false);
+};
+
+window.initTipTap = function (elementId, initialContent, dotnetHelper, isReadOnly = false) {
     const container = document.getElementById(elementId);
     if (!container) return;
 
@@ -88,15 +95,16 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper) {
     const editor = new window.TipTap.Editor({
         element: container,
         content: parseCustomMarkdownToHtml(initialContent),
+        editable: !isReadOnly, // Native TipTap editable flag
         editorProps: {
             attributes: { spellcheck: 'false' },
             handlePaste(view, event) {
+                if (isReadOnly) return true;
                 const plainText = event.clipboardData.getData('text/plain');
                 if (plainText) {
-                    // Pre-process pasted raw markdown into HTML structure
                     const parsedHtml = parseCustomMarkdownToHtml(plainText);
                     editor.commands.insertContent(parsedHtml);
-                    return true; // Intercept and resolve paste manually
+                    return true;
                 }
                 return false;
             }
@@ -127,11 +135,13 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper) {
 function parseCustomMarkdownToHtml(markdown) {
     if (!markdown || !markdown.trim()) return '<p></p>';
 
-    // Unescape pasted backslashes
+    // Unescape pasted backslashes and HTML entities
     let src = markdown
         .replace(/\u2029/g, '\n')
         .replace(/\u2028/g, ' ')
         .replace(/\r\n/g, '\n')
+        .replace(/&lt;/g, '<')  // Restore raw angle brackets
+        .replace(/&gt;/g, '>')  // Restore raw angle brackets
         .replace(/\\([#\-*@_>])/g, '$1') // Remove escaping backslashes
         .trim();
 
@@ -196,10 +206,12 @@ function serializeDocumentToCustomMarkdown(editor) {
     // 3. Convert <span class="keyword-mark">
     markdown = markdown.replace(/<span[^>]*class="keyword-mark"[^>]*>([\s\S]*?)<\/span>/gi, '==$1==');
 
-    // 4. Clean residual escapes (#, -, *, brackets)
+    // 4. Clean residual escapes (#, -, *, brackets) AND unescape HTML entities
     markdown = markdown
         .replace(/\\([#\-*@_>])/g, '$1')
-        .replace(/\\\[([a-zA-Z0-9_-]+)\\\]/g, '[$1]');
+        .replace(/\\\[([a-zA-Z0-9_-]+)\\\]/g, '[$1]')
+        .replace(/&lt;/g, '<')  // Unescape left angle bracket
+        .replace(/&gt;/g, '>'); // Unescape right angle bracket
 
     return markdown.trim();
 }

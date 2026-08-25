@@ -227,13 +227,21 @@ h1:focus {
     box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
 }
 
+.tiptap-container,
+.tiptap-wrapper textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
 .icon-card:hover {
     background-color: #e9ecef !important;
     border-color: #0d6efd !important;
 }
 
 .tiptap-wrapper {
-    background-color: transparent; /* #f8f9fa; */
+    width: 100% !important;
+    box-sizing: border-box;
 }
 
     .tiptap-wrapper:focus-within {
