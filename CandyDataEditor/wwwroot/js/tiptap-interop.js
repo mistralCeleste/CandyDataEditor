@@ -84,6 +84,42 @@ window.setTipTapEditable = function (elementId, isEditable) {
     editor.setEditable(isEditable, false);
 };
 
+// Attach one-time global click & keydown listeners to dismiss the context menu
+window.attachContextMenuDismissListener = function (dotnetRef) {
+    const dismissHandler = (event) => {
+        // Ignore clicks originating inside the context menu itself
+        if (event.target.closest('.dropdown-menu')) {
+            return;
+        }
+
+        // Notify Blazor to close menu
+        if (dotnetRef) {
+            dotnetRef.invokeMethodAsync('CloseSpellcheckContextMenu');
+        }
+
+        // Clean up listeners
+        document.removeEventListener('mousedown', dismissHandler, true);
+        document.removeEventListener('keydown', keydownHandler, true);
+    };
+
+    const keydownHandler = (event) => {
+        // Close menu on Escape key
+        if (event.key === 'Escape') {
+            if (dotnetRef) {
+                dotnetRef.invokeMethodAsync('CloseSpellcheckContextMenu');
+            }
+            document.removeEventListener('mousedown', dismissHandler, true);
+            document.removeEventListener('keydown', keydownHandler, true);
+        }
+    };
+
+    // Use capture phase (true) so clicks anywhere in the window trigger this before other stopPropagation calls
+    setTimeout(() => {
+        document.addEventListener('mousedown', dismissHandler, true);
+        document.addEventListener('keydown', keydownHandler, true);
+    }, 10);
+};
+
 window.initTipTap = function (elementId, initialContent, dotnetHelper, isReadOnly = false) {
     const container = document.getElementById(elementId);
     if (!container) return;
@@ -131,6 +167,32 @@ window.initTipTap = function (elementId, initialContent, dotnetHelper, isReadOnl
 
     window.tiptapInstances[elementId] = editor;
 };
+
+// Word Replacement Handler called by TipTapEditor context menu
+window.replaceTipTapRange = function (elementId, from, to, originalWord, newText) {
+    const editor = window.tiptapInstances ? window.tiptapInstances[elementId] : null;
+    if (!editor) return;
+
+    const textToInsert = originalWord ? matchCase(originalWord, newText) : newText;
+
+    editor.chain()
+        .focus()
+        .deleteRange({ from, to })
+        .insertContentAt(from, textToInsert)
+        .run();
+};
+
+function matchCase(original, replacement) {
+    if (!original || !replacement) return replacement;
+    if (original === original.toUpperCase() && original.length > 1) {
+        return replacement.toUpperCase();
+    }
+    const firstChar = original.charAt(0);
+    if (firstChar === firstChar.toUpperCase() && firstChar !== firstChar.toLowerCase()) {
+        return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+    }
+    return replacement.toLowerCase();
+}
 
 function parseCustomMarkdownToHtml(markdown) {
     if (!markdown || !markdown.trim()) return '<p></p>';

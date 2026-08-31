@@ -264,6 +264,8 @@ public class SqliteDataService
                 .Where(kvp => meta.TryGetValue(kvp.Key, out var m) && !m.IsGenerated && !m.IsReadOnly)
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
 
+            if (!writableValues.Any()) return generatedValues;
+
             using var transaction = await connection.BeginTransactionAsync();
             var command = connection.CreateCommand();
             command.Transaction = (SqliteTransaction)transaction;
@@ -281,7 +283,7 @@ public class SqliteDataService
             }
 
             string selectGenCols = string.Join(", ", genCols.Select(c => $"\"{c.Replace("\"", "\"\"")}\""));
-            command.CommandText = $"INSERT INTO \"{tableName.Replace("\"", "\"\"")}\" ({string.Join(", ", cols)}) VALUES ({string.Join(", ", paramsList)}) RETURNING {selectGenCols};";
+            command.CommandText = $"INSERT OR REPLACE INTO \"{tableName.Replace("\"", "\"\"")}\" ({string.Join(", ", cols)}) VALUES ({string.Join(", ", paramsList)}) RETURNING {selectGenCols};";
 
             using var reader = await command.ExecuteReaderAsync();
             if (await reader.ReadAsync())
@@ -289,16 +291,16 @@ public class SqliteDataService
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
                     string colName = reader.GetName(i);
-                    string val = reader.IsDBNull(i) ? string.Empty : reader.GetValue(i).ToString() ?? string.Empty;
+                    string val = reader.IsDBNull(i) ? string.Empty : reader.GetValue(i)?.ToString() ?? string.Empty;
                     generatedValues[colName] = val;
                 }
             }
 
             await transaction.RollbackAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            Debug.WriteLine("Error recalculating generated fields. Ensure the database schema supports the provided inputs.");
+            Debug.WriteLine($"Error recalculating generated fields. Exception: {ex}");
         }
 
         return generatedValues;
