@@ -204,19 +204,22 @@ namespace CandyDataEditor.Pages
         {
             if (editingRow == null) return;
 
-            var recalculatedGenFields = await DbService.RecalculateGeneratedFieldsAsync(selectedTable, editingRow);
-
-            foreach (var kvp in recalculatedGenFields)
+            if (HasUnsavedChanges())
             {
-                editingRow[kvp.Key] = kvp.Value;
-            }
+                var recalculatedGenFields = await DbService.RecalculateGeneratedFieldsAsync(selectedTable, editingRow);
 
-            if (autoSaveEnabled && HasUnsavedChanges())
-            {
-                await SaveCurrentRecord();
-            }
+                foreach (var kvp in recalculatedGenFields)
+                {
+                    editingRow[kvp.Key] = kvp.Value;
+                }
 
-            StateHasChanged();
+                if (autoSaveEnabled)
+                {
+                    await SaveCurrentRecord();
+                }
+
+                StateHasChanged();
+            }
         }
 
         protected async Task RequestRecordNavigationForTable(string targetTable, Dictionary<string, string>? targetKeyMap)
