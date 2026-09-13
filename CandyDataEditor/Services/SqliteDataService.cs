@@ -102,16 +102,16 @@ public class SqliteDataService
     /// <summary>
     /// Fetches primary key values for all rows in a table to populate the left sidebar accordion.
     /// </summary>
-    public async Task<List<Dictionary<string, string>>> GetRecordKeysAsync(string tableName, List<string> pkColumns)
+    public async Task<List<Dictionary<string, string>>> GetRecordColumnsAsync(string tableName, List<string> columns)
     {
         var result = new List<Dictionary<string, string>>();
-        if (!pkColumns.Any() || string.IsNullOrWhiteSpace(tableName)) return result;
+        if (!columns.Any() || string.IsNullOrWhiteSpace(tableName)) return result;
 
         using var connection = new SqliteConnection(GetConnectionString());
         await connection.OpenAsync();
 
-        string cols = string.Join(", ", pkColumns.Select(c => $"\"{c.Replace("\"", "\"\"")}\""));
-        string orderBy = string.Join(", ", pkColumns.Select(c => $"\"{c.Replace("\"", "\"\"")}\" ASC"));
+        string cols = string.Join(", ", columns.Select(c => $"\"{c.Replace("\"", "\"\"")}\""));
+        string orderBy = string.Join(", ", columns.Select(c => $"\"{c.Replace("\"", "\"\"")}\" ASC"));
         string sql = $"SELECT {cols} FROM \"{tableName.Replace("\"", "\"\"")}\" ORDER BY {orderBy} LIMIT {Config.QueryRowLimit};";
 
         using var command = new SqliteCommand(sql, connection);
@@ -119,12 +119,12 @@ public class SqliteDataService
 
         while (await reader.ReadAsync())
         {
-            var keyMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var columnMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < reader.FieldCount; i++)
             {
-                keyMap[reader.GetName(i)] = reader.IsDBNull(i) ? "" : reader.GetValue(i).ToString() ?? "";
+                columnMap[reader.GetName(i)] = reader.IsDBNull(i) ? "" : reader.GetValue(i).ToString() ?? "";
             }
-            result.Add(keyMap);
+            result.Add(columnMap);
         }
 
         return result;

@@ -50,7 +50,7 @@ namespace CandyDataEditor.Components.Layout
             {
                 selectedTable = firstTable.Name;
                 expandedTable = firstTable.Name;
-                await LoadRecordKeysAsync(firstTable.Name);
+                await LoadRecordColumnsAsync(firstTable.Name);
             }
 
             isLoadingTables = false;
@@ -67,25 +67,30 @@ namespace CandyDataEditor.Components.Layout
             {
                 expandedTable = tableName;
                 selectedTable = tableName;
-                await LoadRecordKeysAsync(tableName);
+                await LoadRecordColumnsAsync(tableName);
             }
         }
 
-        private async Task LoadRecordKeysAsync(string tableName)
+        private async Task LoadRecordColumnsAsync(string tableName)
         {
             if (!tableRecordKeys.ContainsKey(tableName))
             {
                 var meta = await DbService.GetColumnMetadataAsync(tableName);
-                var pkCols = meta.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key).ToList();
+                var columns = meta.Where(IncludeColumnsInSidebarPane()).Select(c => c.Key).ToList();
 
-                if (!pkCols.Any())
+                if (!columns.Any())
                 {
                     var tableData = await DbService.GetTableDataAsync(tableName);
-                    if (tableData.Columns.Any()) pkCols.Add(tableData.Columns.First());
+                    if (tableData.Columns.Any()) columns.Add(tableData.Columns.First());
                 }
 
-                tableRecordKeys[tableName] = await DbService.GetRecordKeysAsync(tableName, pkCols);
+                tableRecordKeys[tableName] = await DbService.GetRecordColumnsAsync(tableName, columns);
             }
+        }
+
+        private Func<KeyValuePair<string, ColumnMetadata>, bool> IncludeColumnsInSidebarPane()
+        {
+            return c => c.Value.IsPrimaryKey || string.Compare(c.Value.ColumnName, "name", StringComparison.OrdinalIgnoreCase) == 0;
         }
 
         protected void NavigateToRecord(string tableName, Dictionary<string, string> keyMap)

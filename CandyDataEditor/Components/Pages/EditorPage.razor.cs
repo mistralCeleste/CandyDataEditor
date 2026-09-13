@@ -114,7 +114,7 @@ namespace CandyDataEditor.Pages
             var pkCols = columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key).ToList();
             if (!pkCols.Any() && tableData.Columns.Any()) pkCols.Add(tableData.Columns.First());
 
-            tableRecordKeys[tableName] = await DbService.GetRecordKeysAsync(tableName, pkCols);
+            tableRecordKeys[tableName] = await DbService.GetRecordColumnsAsync(tableName, pkCols);
 
             isLoadingData = false;
         }
@@ -354,7 +354,7 @@ namespace CandyDataEditor.Pages
             if (!pkCols.Any() && tableData != null && tableData.Columns.Any())
                 pkCols.Add(tableData.Columns.First());
 
-            tableRecordKeys[selectedTable] = await DbService.GetRecordKeysAsync(selectedTable, pkCols);
+            tableRecordKeys[selectedTable] = await DbService.GetRecordColumnsAsync(selectedTable, pkCols);
             return true;
         }
 
