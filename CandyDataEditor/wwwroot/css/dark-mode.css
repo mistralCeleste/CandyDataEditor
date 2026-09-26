@@ -124,6 +124,7 @@ body.dark-mode {
         --bs-table-hover-bg: #2c2c2c;
         --bs-table-hover-color: #fff;
         border-color: #333;
+        color: var(--bs-body-color) !important;
     }
 
     [data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) {

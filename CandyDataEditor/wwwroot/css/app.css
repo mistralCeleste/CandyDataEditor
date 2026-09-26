@@ -117,10 +117,9 @@ h1:focus {
     border-color: #0d6efd;
 }
 
-/* 1. OTF Font Registration */
+/* OTF Font Registration */
 @font-face {
     font-family: 'GameIcons';
-    src: url('../fonts/GameIcons.otf') format('opentype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -136,7 +135,7 @@ h1:focus {
     color: #0d6efd; /* Light accent tint for icons in editor */
 }
 
-/* 2. Ligatures (Icons, Arrows ->, <-, and Em-dash --) */
+/* Ligatures (Icons, Arrows ->, <-, and Em-dash --) */
 .tiptap-container .game-icon-ligature {
     font-family: 'GameIcons', sans-serif !important;
     font-variant-ligatures: discretionary-ligs common-ligatures contextual !important;
@@ -147,7 +146,7 @@ h1:focus {
     color: #0d6efd; /* Light accent tint for icons in editor */
 }
 
-/* 3. Action Menu - Parent (@ Action) */
+/* Action Menu - Parent (@ Action) */
 .tiptap-container .action-menu-parent {
     text-align: center;
     background-color: #2c3e50;
@@ -160,7 +159,7 @@ h1:focus {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* 4. Action Menu - Child (@@ Sub-Action) */
+/* Action Menu - Child (@@ Sub-Action) */
 .tiptap-container .action-menu-child {
     text-align: left;
     background-color: #ecf0f1;
@@ -172,7 +171,7 @@ h1:focus {
     border-radius: 4px;
 }
 
-/* 5. Keyword Mark (==keyword== -> Bold + Underline) */
+/* Keyword Mark (==keyword== -> Bold + Underline) */
 .tiptap-container .keyword-mark {
     font-weight: bold;
     text-decoration: underline;

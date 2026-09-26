@@ -161,13 +161,102 @@ namespace CandyDataEditor.Pages
             originalRowSnapshot = new Dictionary<string, string>(row, StringComparer.OrdinalIgnoreCase);
 
             originalKeys.Clear();
-            foreach (var kvp in columnMetadata)
+
+            foreach (var kvp in columnMetadata.Where(c => c.Value.IsPrimaryKey))
             {
-                if (kvp.Value.IsPrimaryKey && row.ContainsKey(kvp.Key))
+                if (row.TryGetValue(kvp.Key, out var val))
                 {
-                    originalKeys[kvp.Key] = row[kvp.Key];
+                    originalKeys[kvp.Key] = val;
                 }
             }
+
+            if (!originalKeys.Any() && tableData != null && tableData.Columns.Any())
+            {
+                string firstCol = tableData.Columns.First();
+                if (row.TryGetValue(firstCol, out var val))
+                {
+                    originalKeys[firstCol] = val;
+                }
+            }
+        }
+        protected void OnCellValueChanged(string columnName, string value)
+        {
+            SetFieldValue(columnName, value);
+            ValidateCurrentRecord();
+        }
+
+        protected string CleanTextValue(string? val)
+        {
+            if (string.IsNullOrWhiteSpace(val)) return "";
+            string trimmed = val.Trim();
+            if (trimmed == "<p></p>" || trimmed == "<p><br></p>" || trimmed == "<br>" || trimmed == "\\n") return "";
+            return trimmed;
+        }
+
+        /// <summary>
+        /// Validates Primary Keys for non-empty values and uniqueness against existing table records.
+        /// </summary>
+        protected bool ValidateCurrentRecord()
+        {
+            fieldErrorMessages.Clear();
+            if (editingRow == null) return true;
+
+            var pkCols = columnMetadata
+                .Where(c => c.Value.IsPrimaryKey)
+                .Select(c => c.Key)
+                .ToList();
+
+            if (!pkCols.Any() && tableData != null && tableData.Columns.Any())
+            {
+                pkCols.Add(tableData.Columns.First());
+            }
+
+            foreach (var pk in pkCols)
+            {
+                string rawVal = editingRow.GetValueOrDefault(pk, "");
+                string cleanedVal = CleanTextValue(rawVal);
+
+                if (string.IsNullOrWhiteSpace(cleanedVal))
+                {
+                    fieldErrorMessages[pk] = "Primary Key field cannot be empty.";
+                }
+            }
+
+            if (!fieldErrorMessages.Any() && tableRecordKeys.TryGetValue(selectedTable, out var existingRecords))
+            {
+                var currentPkValues = pkCols
+                    .Select(pk => CleanTextValue(editingRow.GetValueOrDefault(pk, "")))
+                    .ToList();
+
+                string currentCompositeKey = string.Join("|||", currentPkValues);
+
+                for (int i = 0; i < existingRecords.Count; i++)
+                {
+                    var recordMap = existingRecords[i];
+
+                    if (originalKeys != null && originalKeys.Any() && IsMatchingKeys(recordMap, originalKeys))
+                    {
+                        continue;
+                    }
+
+                    var recordPkValues = pkCols
+                        .Select(pk => CleanTextValue(recordMap.GetValueOrDefault(pk, "")))
+                        .ToList();
+
+                    string recordCompositeKey = string.Join("|||", recordPkValues);
+
+                    if (string.Equals(currentCompositeKey, recordCompositeKey, StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (var pk in pkCols)
+                        {
+                            fieldErrorMessages[pk] = $"Key conflict! This key combination already matches record #{i + 1} ({FormatKeyMapLabel(recordMap)}).";
+                        }
+                        break;
+                    }
+                }
+            }
+
+            return !fieldErrorMessages.Any();
         }
 
         protected void CloseRecordEditor()
@@ -204,6 +293,8 @@ namespace CandyDataEditor.Pages
         {
             if (editingRow == null) return;
 
+            bool isValid = ValidateCurrentRecord();
+
             if (HasUnsavedChanges())
             {
                 var recalculatedGenFields = await DbService.RecalculateGeneratedFieldsAsync(selectedTable, editingRow);
@@ -213,7 +304,7 @@ namespace CandyDataEditor.Pages
                     editingRow[kvp.Key] = kvp.Value;
                 }
 
-                if (autoSaveEnabled)
+                if (autoSaveEnabled && isValid)
                 {
                     await SaveCurrentRecord();
                 }
@@ -264,7 +355,6 @@ namespace CandyDataEditor.Pages
             {
                 saveErrorMessage = null;
                 fieldErrorMessages.Clear();
-
                 originalKeys = new Dictionary<string, string>(targetKeyMap, StringComparer.OrdinalIgnoreCase);
                 editingRow = new Dictionary<string, string>(record, StringComparer.OrdinalIgnoreCase);
                 originalRowSnapshot = new Dictionary<string, string>(record, StringComparer.OrdinalIgnoreCase);
@@ -304,7 +394,12 @@ namespace CandyDataEditor.Pages
             if (editingRow == null) return false;
 
             saveErrorMessage = null;
-            fieldErrorMessages.Clear();
+
+            if (!ValidateCurrentRecord())
+            {
+                saveErrorMessage = "Please fix highlighted Primary Key validation errors before saving.";
+                return false;
+            }
 
             var writableValues = editingRow
                 .Where(kvp =>
@@ -336,18 +431,23 @@ namespace CandyDataEditor.Pages
                 {
                     foreach (var col in columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key))
                     {
-                        fieldErrorMessages[col] = "Key conflict! This key combination already exists.";
+                        fieldErrorMessages[col] = "Key conflict! Database returned a Primary Key / Unique constraint violation.";
                     }
                 }
                 return false;
             }
 
             originalRowSnapshot = new Dictionary<string, string>(editingRow, StringComparer.OrdinalIgnoreCase);
-            originalKeys.Clear();
-            foreach (var kvp in columnMetadata.Where(c => c.Value.IsPrimaryKey))
+            
+            if (originalKeys != null)
             {
-                if (editingRow.ContainsKey(kvp.Key))
-                    originalKeys[kvp.Key] = editingRow[kvp.Key];
+                originalKeys.Clear();
+
+                foreach (var kvp in columnMetadata.Where(c => c.Value.IsPrimaryKey))
+                {
+                    if (editingRow.ContainsKey(kvp.Key))
+                        originalKeys[kvp.Key] = editingRow[kvp.Key];
+                }
             }
 
             var pkCols = columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key).ToList();
@@ -459,6 +559,36 @@ namespace CandyDataEditor.Pages
         protected string FormatKeyMapLabel(Dictionary<string, string> keyMap)
         {
             return string.Join(" | ", keyMap.Values);
+        }
+
+        protected string GetSelectedKeyMapLabel()
+        {
+            if (originalKeys == null || !originalKeys.Any()) return string.Empty;
+
+            // Get the primary key column names for the current table
+            var pkCols = columnMetadata
+                .Where(c => c.Value.IsPrimaryKey)
+                .Select(c => c.Key)
+                .ToList();
+
+            // Fallback if no explicit PK is defined in schema
+            if (!pkCols.Any() && tableData != null && tableData.Columns.Any())
+            {
+                pkCols.Add(tableData.Columns.First());
+            }
+
+            // Build a filtered key map matching the exact structure used in tableRecordKeys
+            var filteredMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pk in pkCols)
+            {
+                if (originalKeys.TryGetValue(pk, out var val))
+                {
+                    filteredMap[pk] = val;
+                }
+            }
+
+            // Fallback: if filteredMap is empty but originalKeys has entries, use originalKeys
+            return FormatKeyMapLabel(filteredMap.Any() ? filteredMap : originalKeys);
         }
 
         protected bool IsMatchingKeys(Dictionary<string, string> a, Dictionary<string, string> b)

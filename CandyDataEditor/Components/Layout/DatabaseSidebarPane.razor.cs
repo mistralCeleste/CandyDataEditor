@@ -8,6 +8,8 @@ namespace CandyDataEditor.Components.Layout
         [Inject] protected SqliteDataService DbService { get; set; } = default!;
         [Inject] protected NavigationManager NavManager { get; set; } = default!;
 
+        protected bool isCollapsed = false;
+
         protected List<DbObjectInfo> dbObjects = new();
         protected Dictionary<string, List<Dictionary<string, string>>> tableRecordKeys = new(StringComparer.OrdinalIgnoreCase);
 
@@ -25,6 +27,7 @@ namespace CandyDataEditor.Components.Layout
         protected override async Task OnInitializedAsync()
         {
             DbService.OnDatabasePathChanged += HandleDatabaseChanged;
+            DbService.OnDataChanged += HandleDataChangedAsync;
             await RefreshDatabaseObjectsAsync();
         }
 
@@ -55,6 +58,11 @@ namespace CandyDataEditor.Components.Layout
 
             isLoadingTables = false;
             StateHasChanged();
+        }
+
+        protected void ToggleCollapse()
+        {
+            isCollapsed = !isCollapsed;
         }
 
         protected async Task ToggleTableAccordionAsync(string tableName)
@@ -126,9 +134,32 @@ namespace CandyDataEditor.Components.Layout
             NavManager.NavigateTo("/");
         }
 
+        private async Task HandleDataChangedAsync()
+        {
+            /* Preserve current expanded table state while refreshing keys */
+            string? currentExpanded = expandedTable;
+
+            dbObjects = await DbService.GetTablesAndViewsAsync();
+            tableRecordKeys.Clear();
+
+            if (!string.IsNullOrEmpty(currentExpanded))
+            {
+                await LoadRecordColumnsAsync(currentExpanded);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        protected void NavigateToTableGrid(string tableName)
+        {
+            selectedTable = tableName;
+            NavManager.NavigateTo($"/table-editor/{Uri.EscapeDataString(tableName)}");
+        }
+
         public void Dispose()
         {
             DbService.OnDatabasePathChanged -= HandleDatabaseChanged;
+            DbService.OnDataChanged -= HandleDataChangedAsync;
         }
     }
 }

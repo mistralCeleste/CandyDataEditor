@@ -11,6 +11,9 @@ namespace CandyDataEditor.Services;
 public class SqliteDataService
 {
     public event Func<string, Task>? OnDatabasePathChanged;
+
+    public event Func<Task>? OnDataChanged;
+
     public SqliteEditorConfig Config { get; }
 
     public bool HasActiveDatabase => !string.IsNullOrEmpty(_dbPath);
@@ -57,6 +60,14 @@ public class SqliteDataService
         if (OnDatabasePathChanged != null)
         {
             await OnDatabasePathChanged.Invoke(string.Empty);
+        }
+    }
+
+    public async Task NotifyDataChangedAsync()
+    {
+        if (OnDataChanged != null)
+        {
+            await OnDataChanged.Invoke();
         }
     }
 
@@ -350,6 +361,7 @@ public class SqliteDataService
             command.CommandText = sql;
 
             await command.ExecuteNonQueryAsync();
+            await NotifyDataChangedAsync();
             return null;
         }
         catch (SqliteException ex)
@@ -393,6 +405,7 @@ public class SqliteDataService
 
             command.CommandText = $"INSERT INTO \"{tableName.Replace("\"", "\"\"")}\" ({string.Join(", ", cols)}) VALUES ({string.Join(", ", paramsList)});";
             await command.ExecuteNonQueryAsync();
+            await NotifyDataChangedAsync();
             return null;
         }
         catch (SqliteException ex)
@@ -424,6 +437,7 @@ public class SqliteDataService
 
             command.CommandText = $"DELETE FROM \"{tableName.Replace("\"", "\"\"")}\" WHERE {string.Join(" AND ", whereClauses)};";
             await command.ExecuteNonQueryAsync();
+            await NotifyDataChangedAsync();
             return null;
         }
         catch (SqliteException ex)
@@ -441,56 +455,63 @@ public class SqliteDataService
 
         foreach (var table in tableNames)
         {
-            var data = await GetTableDataAsync(table);
-            string filePath = Path.Combine(outputDirectory, $"{table}.{format.ToLower()}");
-
-            if (format.Equals("tsv", StringComparison.OrdinalIgnoreCase) || format.Equals("csv", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                bool isTsv = format.Equals("tsv", StringComparison.OrdinalIgnoreCase);
-                char sep = isTsv ? '\t' : ',';
-                var sb = new StringBuilder();
+                var data = await GetTableDataAsync(table);
+                string filePath = Path.Combine(outputDirectory, $"{table}.{format.ToLower()}");
 
-                // Header Row
-                sb.AppendLine(string.Join(sep, data.Columns));
-
-                // Data Rows
-                foreach (var row in data.Rows)
+                if (format.Equals("tsv", StringComparison.OrdinalIgnoreCase) || format.Equals("csv", StringComparison.OrdinalIgnoreCase))
                 {
-                    var values = data.Columns.Select(c =>
+                    bool isTsv = format.Equals("tsv", StringComparison.OrdinalIgnoreCase);
+                    char sep = isTsv ? '\t' : ',';
+                    var sb = new StringBuilder();
+
+                    // Header Row
+                    sb.AppendLine(string.Join(sep, data.Columns));
+
+                    // Data Rows
+                    foreach (var row in data.Rows)
                     {
-                        if (!row.TryGetValue(c, out var val) || string.IsNullOrEmpty(val))
-                            return "\"\"";
+                        var values = data.Columns.Select(c =>
+                        {
+                            if (!row.TryGetValue(c, out var val) || string.IsNullOrEmpty(val))
+                                return "\"\"";
 
-                        string cleanValue = val;
-                        cleanValue = Regex.Replace(cleanValue, @"[\r\n\u2028\u2029]+", "<br>");
-                        cleanValue = cleanValue.Replace("\"", "\"\"");
-                        cleanValue = cleanValue.Trim();
-                        return $"\"{cleanValue}\"";
-                    });
+                            string cleanValue = val;
+                            cleanValue = Regex.Replace(cleanValue, @"[\r\n\u2028\u2029]+", "<br>");
+                            cleanValue = cleanValue.Replace("\"", "\"\"");
+                            cleanValue = cleanValue.Trim();
+                            return $"\"{cleanValue}\"";
+                        });
 
-                    sb.AppendLine(string.Join(sep, values));
+                        sb.AppendLine(string.Join(sep, values));
+                    }
+
+                    await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.UTF8);
                 }
+                else if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                {
+                    string json = JsonSerializer.Serialize(data.Rows, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(filePath, json, Encoding.UTF8);
+                }
+                else if (format.Equals("xml", StringComparison.OrdinalIgnoreCase))
+                {
+                    string rootTag = SanitizeXmlElementName(table);
 
-                await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.UTF8);
+                    var xDoc = new XDocument(
+                        new XElement(rootTag + "List",
+                            data.Rows.Select(r => new XElement("Record",
+                                r.Select(kvp => new XElement(SanitizeXmlElementName(kvp.Key), kvp.Value ?? ""))
+                            ))
+                        )
+                    );
+
+                    xDoc.Save(filePath);
+                }
             }
-            else if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+            catch (Exception ex)
             {
-                string json = JsonSerializer.Serialize(data.Rows, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(filePath, json, Encoding.UTF8);
-            }
-            else if (format.Equals("xml", StringComparison.OrdinalIgnoreCase))
-            {
-                string rootTag = SanitizeXmlElementName(table);
-
-                var xDoc = new XDocument(
-                    new XElement(rootTag + "List",
-                        data.Rows.Select(r => new XElement("Record",
-                            r.Select(kvp => new XElement(SanitizeXmlElementName(kvp.Key), kvp.Value ?? ""))
-                        ))
-                    )
-                );
-
-                xDoc.Save(filePath);
+                Console.WriteLine($"Error exporting table {table}: {ex.Message}");
             }
         }
     }

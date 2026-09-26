@@ -1,0 +1,155 @@
+﻿@page "/table-editor/{TableName}"
+@namespace CandyDataEditor.Pages
+@using CandyDataEditor.Services
+@using CandyDataEditor.Components.MessageBoxes
+
+<PageTitle>Table Grid View - @TableName</PageTitle>
+
+<div class="container-fluid my-3">
+    <!-- Header Controls Bar -->
+    <div class="d-flex align-items-center justify-content-between mb-3 bg-light p-3 rounded border shadow-sm flex-wrap gap-2 sticky-top">
+        <div>
+            <h4 class="mb-0 fw-bold">📊 Batch Table Editor: <code>@TableName</code></h4>
+            <small class="text-muted">Edit records, manage Primary Keys, and perform batch operations.</small>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-success" @onclick="AddNewRow" disabled="@isSaving">
+                ➕ New Record
+            </button>
+            <button class="btn btn-info text-white" @onclick="CloneSelectedRow" disabled="@(isSaving || selectedRowIndex < 0 || selectedRowIndex >= gridRows.Count)">
+                📋 Clone Selected
+            </button>
+            <button class="btn btn-primary ms-2" @onclick="SaveAllChangesAsync" disabled="@(isSaving || HasValidationErrors)">
+                @if (isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span>Saving...</span>
+                }
+                else
+                {
+                    <span>💾 Save All Changes</span>
+                }
+            </button>
+            <button class="btn btn-outline-secondary" @onclick="ReloadDataAsync" disabled="@isSaving">
+                🔄 Reload
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-success shadow-sm mb-3">
+            ✅ @statusMessage
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="p-5 text-center text-muted">
+            <div class="spinner-border mb-2" role="status"></div>
+            <div>Loading table data...</div>
+        </div>
+    }
+    else if (gridRows.Any())
+    {
+        <div class="border rounded shadow-sm bg-body">
+            <table class="table table-bordered table-striped align-middle mb-0">
+                <thead class="table-dark sticky-top" style="z-index: 10; top: 80px;">
+                    <tr>
+                        <th style="width: 50px;" class="text-center">Select</th>
+                        <th style="width: 50px;" class="text-center">#</th>
+                        @foreach (var col in columns)
+                        {
+                            var meta = columnMetadata.TryGetValue(col, out var m) ? m : new ColumnMetadata();
+                            <th>
+                                <div>@col</div>
+                                @if (meta.IsPrimaryKey)
+                                {
+                                    <span class="badge bg-primary fs-8">PK (Editable)</span>
+                                }
+                                else if (meta.IsReadOnly || meta.IsGenerated)
+                                {
+                                    <span class="badge bg-secondary fs-8">ReadOnly</span>
+                                }
+                            </th>
+                        }
+                        <th style="width: 60px;" class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int rowIndex = 0; rowIndex < gridRows.Count; rowIndex++)
+                    {
+                        int currentIdx = rowIndex;
+                        var row = gridRows[currentIdx];
+                        bool isSelected = selectedRowIndex == currentIdx;
+
+                        /* KEY FIX 1: Explicit @key ensures Blazor tracks row identity during clone/insert */
+                        <tr @key="row" class="@(isSelected ? "table-primary" : "")" style="cursor: pointer;" @onclick="() => ToggleRowSelection(currentIdx)">
+                            <td class="text-center" @onclick:stopPropagation="true">
+                                <input type="radio" 
+                                       name="gridRowRadioGroup" 
+                                       checked="@isSelected" 
+                                       @onclick="() => ToggleRowSelection(currentIdx)" />
+                            </td>
+                            <td class="text-center text-muted fw-bold">
+                                @(currentIdx + 1)
+                            </td>
+                            @foreach (var col in columns)
+                            {
+                                var meta = columnMetadata.TryGetValue(col, out var m) ? m : new ColumnMetadata();
+                                bool isNonPkReadOnly = (!meta.IsPrimaryKey && (meta.IsReadOnly || meta.IsGenerated));
+
+                                string cellError = row.FieldErrors.GetValueOrDefault(col, string.Empty);
+                                bool hasError = !string.IsNullOrEmpty(cellError);
+
+                                <td style="min-width: 200px; vertical-align: top;" @onclick:stopPropagation="true">
+                                    @if (isNonPkReadOnly)
+                                    {
+                                        <div class="p-2 text-muted font-monospace rounded border border-light-subtle bg-light">
+                                            @row.CurrentValues.GetValueOrDefault(col, "")
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <!-- Editable Cell (PK or Standard Field) -->
+                                        /* KEY FIX 2: Explicit @key on TipTapEditor forces DOM re-creation per cell */
+                                        <div class="@(hasError ? "border border-danger border-2 rounded p-1" : "")" 
+                                             title="@cellError">
+                                            <TipTapEditor @key='@($"{row.RowId}_{col}")'
+                                                          MarkdownValue="@row.CurrentValues.GetValueOrDefault(col, "")"
+                                                          MarkdownValueChanged="(val) => OnCellValueChanged(row, col, val)"
+                                                          ShowToolbar="false"
+                                                          IsReadOnly="false" />
+                                        </div>
+                                        @if (hasError)
+                                        {
+                                            <small class="text-danger fw-bold d-block mt-1">⚠️ @cellError</small>
+                                        }
+                                    }
+                                </td>
+                            }
+                            <td class="text-center" @onclick:stopPropagation="true">
+                                <button type="button" class="btn btn-sm btn-outline-danger border-0" 
+                                        title="Remove Row" 
+                                        @onclick="() => RemoveRow(currentIdx)">
+                                    🗑️
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info text-center p-4">
+            No records found in table <strong>@TableName</strong>. Click <strong>➕ New Record</strong> to insert an empty row.
+        </div>
+    }
+</div>
+
+<!-- ERROR DIALOG -->
+<MessageBox @bind-IsOpen="showMessageBox"
+            Title="@messageBoxTitle"
+            Message="@messageBoxMessage" />

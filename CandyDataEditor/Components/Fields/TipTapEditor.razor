@@ -3,8 +3,9 @@
 
 <div id="@elementId" class="tiptap-wrapper border rounded position-relative w-100 d-flex flex-column @(IsReadOnly ? "bg-body-tertiary pe-none" : "")">
 
+
     <!-- Editor Toolbar (Hidden when ReadOnly) -->
-    @if (!IsReadOnly)
+    @if (!IsReadOnly && ShowToolbar)
     {
         <div class="tiptap-toolbar bg-light border-bottom p-2 d-flex gap-1 align-items-center flex-wrap position-relative w-100">
             <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='(() => ExecCommand("bold"))' title="Bold (Ctrl+B)">

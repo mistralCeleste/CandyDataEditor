@@ -16,6 +16,7 @@ namespace CandyDataEditor.Components.Fields
             Html
         }
 
+        [Parameter] public bool ShowToolbar { get; set; } = true;
         protected string elementId = $"tiptap_{Guid.NewGuid():N}";
         protected ViewMode currentViewMode = ViewMode.Formatted;
         protected string EditorId = $"tiptap_{Guid.NewGuid():N}";
@@ -41,6 +42,7 @@ namespace CandyDataEditor.Components.Fields
         [Parameter] public bool IsReadOnly { get; set; } = false;
 
         private bool _previousReadOnly = false;
+        private string _previousMarkdownValue = string.Empty;
 
         protected async Task SwitchViewMode(ViewMode newMode)
         {
@@ -163,6 +165,12 @@ namespace CandyDataEditor.Components.Fields
             {
                 _previousReadOnly = IsReadOnly;
                 await JSRuntime.InvokeVoidAsync("setTipTapEditable", EditorId, !IsReadOnly);
+            }
+
+            if (_isInitialized && _previousMarkdownValue != MarkdownValue && currentViewMode == ViewMode.Formatted)
+            {
+                _previousMarkdownValue = MarkdownValue;
+                await JSRuntime.InvokeVoidAsync("setTipTapContentFromMarkdown", EditorId, MarkdownValue);
             }
         }
 
