@@ -22,6 +22,7 @@ namespace CandyDataEditor.Components.Fields
         protected string EditorId = $"tiptap_{Guid.NewGuid():N}";
         private DotNetObjectReference<TipTapEditor>? _dotnetRef;
         private bool _isInitialized = false;
+        private bool _isInternalUpdate = false;
 
         protected bool isIconModalOpen = false;
         protected string searchTerm = string.Empty;
@@ -167,7 +168,7 @@ namespace CandyDataEditor.Components.Fields
                 await JSRuntime.InvokeVoidAsync("setTipTapEditable", EditorId, !IsReadOnly);
             }
 
-            if (_isInitialized && _previousMarkdownValue != MarkdownValue && currentViewMode == ViewMode.Formatted)
+            if (_isInitialized && !_isInternalUpdate && _previousMarkdownValue != MarkdownValue && currentViewMode == ViewMode.Formatted)
             {
                 _previousMarkdownValue = MarkdownValue;
                 await JSRuntime.InvokeVoidAsync("setTipTapContentFromMarkdown", EditorId, MarkdownValue);
@@ -216,11 +217,16 @@ namespace CandyDataEditor.Components.Fields
         [JSInvokable]
         public async Task OnContentChanged(string html, string markdown)
         {
+            _isInternalUpdate = true;
+            _previousMarkdownValue = markdown;
+
             Value = html;
             await ValueChanged.InvokeAsync(html);
 
             MarkdownValue = markdown;
             await MarkdownValueChanged.InvokeAsync(markdown);
+
+            _isInternalUpdate = false;
         }
 
         [Inject] protected SqliteEditorConfig Config { get; set; } = default!;
