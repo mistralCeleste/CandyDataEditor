@@ -23,8 +23,6 @@ public class SqliteDataService
     public SqliteDataService(SqliteEditorConfig config)
     {
         Config = config;
-        //_dbPath = Path.Combine(FileSystem.AppDataDirectory, "game_data.db");
-        //EnsureSampleDatabaseExists();
     }
 
     public string GetDatabasePath() => _dbPath;
@@ -599,28 +597,86 @@ public class SqliteDataService
         return sanitized;
     }
 
-    private void EnsureSampleDatabaseExists()
+
+    /// <summary>
+    /// Searches across specified tables/views for text occurrences and returns snippets with context.
+    /// </summary>
+    public async Task<List<SearchResultItem>> SearchDataAcrossObjectsAsync(List<string> tableNames, string searchTerm, int maxResults = 50)
     {
-        if (File.Exists(_dbPath)) return;
+        var results = new List<SearchResultItem>();
+        if (string.IsNullOrWhiteSpace(searchTerm) || !tableNames.Any() || !HasActiveDatabase)
+            return results;
+
+        string term = searchTerm.Trim();
 
         using var connection = new SqliteConnection(GetConnectionString());
-        connection.Open();
+        await connection.OpenAsync();
 
-        string createTableSql = @"
-            CREATE TABLE IF NOT EXISTS Items (
-                Id TEXT NOT NULL,
-                Version INTEGER NOT NULL,
-                Title TEXT,
-                MarkdownContent TEXT,
-                PRIMARY KEY (Id, Version)
-            );
+        foreach (var table in tableNames)
+        {
+            if (results.Count >= maxResults) break;
 
-            INSERT INTO Items (Id, Version, Title, MarkdownContent) VALUES 
-            ('MAP-001', 1, 'Whirlpool Bluff', '# Setup\n~ [place] MAP-001\n~ [mob] FOE-003\n\nEnemies have ==defense== [defense].'),
-            ('EVT-004', 1, 'Moonlit Pearl Wreck', '# Actions\n@ Wreckage\nBeastfolk **scavengers** prowl the wreck.'),
-            ('PUZ-001A', 1, 'Room Blocks', '# Triggers\n@ 503\nTwo blocks and two symbols are shown.');";
+            var meta = await GetColumnMetadataAsync(table);
+            var pkCols = meta.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key).ToList();
+            if (!pkCols.Any())
+            {
+                var tableData = await GetTableDataAsync(table);
+                if (tableData.Columns.Any()) pkCols.Add(tableData.Columns.First());
+            }
 
-        using var command = new SqliteCommand(createTableSql, connection);
-        command.ExecuteNonQuery();
+            var allCols = meta.Select(m => m.Key).ToList();
+            if (!allCols.Any()) continue;
+
+            var whereClauses = allCols.Select(c => $"\"{c.Replace("\"", "\"\"")}\" LIKE @term");
+            string sql = $"SELECT * FROM \"{table.Replace("\"", "\"\"")}\" WHERE {string.Join(" OR ", whereClauses)} LIMIT 20;";
+
+            using var cmd = new SqliteCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@term", $"%{term}%");
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (results.Count >= maxResults) break;
+
+                var rowValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    rowValues[reader.GetName(i)] = reader.IsDBNull(i) ? "" : reader.GetValue(i).ToString() ?? "";
+                }
+
+                var pkMap = pkCols.ToDictionary(pk => pk, pk => rowValues.GetValueOrDefault(pk, ""), StringComparer.OrdinalIgnoreCase);
+
+                foreach (var col in allCols)
+                {
+                    string val = rowValues.GetValueOrDefault(col, "");
+                    int idx = val.IndexOf(term, StringComparison.OrdinalIgnoreCase);
+
+                    if (idx >= 0)
+                    {
+                        int padding = 25;
+                        int start = Math.Max(0, idx - padding);
+                        int end = Math.Min(val.Length, idx + term.Length + padding);
+
+                        string exactMatch = val.Substring(idx, term.Length);
+                        string prefix = (start > 0 ? "..." : "") + val.Substring(start, idx - start);
+                        string suffix = val.Substring(idx + term.Length, end - (idx + term.Length)) + (end < val.Length ? "..." : "");
+
+                        results.Add(new SearchResultItem
+                        {
+                            TableName = table,
+                            PrimaryKeys = pkMap,
+                            MatchingColumn = col,
+                            SnippetPrefix = prefix,
+                            MatchTerm = exactMatch,
+                            SnippetSuffix = suffix
+                        });
+
+                        if (results.Count >= maxResults) break;
+                    }
+                }
+            }
+        }
+
+        return results;
     }
 }

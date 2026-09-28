@@ -449,3 +449,30 @@
     outline-offset: -2px;
 }
 
+/* Sidebar Match Card Hover */
+.search-snippet-card:hover {
+    background-color: #e9ecef !important;
+    border-left: 3px solid #0d6efd !important;
+}
+
+/* Field Highlight Pulse Effect */
+@keyframes matchPulse {
+    0% {
+        background-color: rgba(255, 224, 102, 0.85);
+        box-shadow: 0 0 10px rgba(255, 193, 7, 0.8);
+    }
+
+    50% {
+        background-color: rgba(255, 224, 102, 0.5);
+    }
+
+    100% {
+        background-color: transparent;
+        box-shadow: none;
+    }
+}
+
+.search-match-active {
+    animation: matchPulse 2s ease-out;
+    border-color: #ffc107 !important;
+}

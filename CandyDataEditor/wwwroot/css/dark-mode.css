@@ -248,6 +248,10 @@ body.dark-mode {
         color: #f06292;
     }
 
+    [data-bs-theme="dark"] .tiptap-container .ProseMirror-focused {
+        background-color: rgb(var(--bs-body-rgb)) !important;
+    }
+
     [data-bs-theme="dark"] .tiptap-wrapper {
         background-color: transparent;
     }

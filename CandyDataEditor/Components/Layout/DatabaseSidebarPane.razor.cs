@@ -1,5 +1,6 @@
 ﻿using CandyDataEditor.Services;
 using Microsoft.AspNetCore.Components;
+using System.Timers;
 
 namespace CandyDataEditor.Components.Layout
 {
@@ -9,6 +10,8 @@ namespace CandyDataEditor.Components.Layout
         [Inject] protected NavigationManager NavManager { get; set; } = default!;
 
         protected bool isCollapsed = false;
+        protected bool isTablesSectionExpanded = true;
+        protected bool isSearchResultsExpanded = true;
 
         protected List<DbObjectInfo> dbObjects = new();
         protected Dictionary<string, List<Dictionary<string, string>>> tableRecordKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -20,6 +23,11 @@ namespace CandyDataEditor.Components.Layout
         protected string searchFilter = string.Empty;
         protected string typeFilter = "table";
 
+        protected List<SearchResultItem> searchResults = new();
+        protected bool isSearchingData = false;
+        protected float debounceDelayInMilliseconds = 350f;
+        private System.Timers.Timer? _debounceTimer;
+
         protected IEnumerable<DbObjectInfo> FilteredObjects => dbObjects
             .Where(o => typeFilter == "all" || o.Type == typeFilter)
             .Where(o => string.IsNullOrWhiteSpace(searchFilter) || o.Name.Contains(searchFilter, StringComparison.OrdinalIgnoreCase));
@@ -28,7 +36,67 @@ namespace CandyDataEditor.Components.Layout
         {
             DbService.OnDatabasePathChanged += HandleDatabaseChanged;
             DbService.OnDataChanged += HandleDataChangedAsync;
+
+            _debounceTimer = new System.Timers.Timer(debounceDelayInMilliseconds) { AutoReset = false };
+            _debounceTimer.Elapsed += OnDebounceTimerElapsedAsync;
+
             await RefreshDatabaseObjectsAsync();
+        }
+
+        protected void SetTypeFilter(string filter)
+        {
+            typeFilter = filter;
+            TriggerDebouncedDataSearch();
+        }
+
+        protected void OnSearchInputChanged(ChangeEventArgs e)
+        {
+            searchFilter = e.Value?.ToString() ?? string.Empty;
+            TriggerDebouncedDataSearch();
+        }
+
+        private void TriggerDebouncedDataSearch()
+        {
+            _debounceTimer?.Stop();
+            _debounceTimer?.Start();
+        }
+
+        private async void OnDebounceTimerElapsedAsync(object? sender, ElapsedEventArgs e)
+        {
+            await InvokeAsync(async () =>
+            {
+                if (string.IsNullOrWhiteSpace(searchFilter))
+                {
+                    searchResults.Clear();
+                    isSearchingData = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                isSearchingData = true;
+                StateHasChanged();
+
+                var activeTables = dbObjects
+                    .Where(o => typeFilter == "all" || o.Type == typeFilter)
+                    .Select(o => o.Name)
+                    .ToList();
+
+                searchResults = await DbService.SearchDataAcrossObjectsAsync(activeTables, searchFilter);
+                isSearchingData = false;
+                StateHasChanged();
+            });
+        }
+
+        protected void NavigateToSearchMatch(SearchResultItem match)
+        {
+            selectedTable = match.TableName;
+
+            var queryParams = match.PrimaryKeys.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}").ToList();
+            queryParams.Add($"FocusColumn={Uri.EscapeDataString(match.MatchingColumn)}");
+            queryParams.Add($"SearchTerm={Uri.EscapeDataString(match.MatchTerm)}");
+
+            string keyParams = string.Join("&", queryParams);
+            NavManager.NavigateTo($"/editor/{Uri.EscapeDataString(match.TableName)}?{keyParams}");
         }
 
         public async Task RefreshDatabaseObjectsAsync()
@@ -37,6 +105,7 @@ namespace CandyDataEditor.Components.Layout
             {
                 dbObjects.Clear();
                 tableRecordKeys.Clear();
+                searchResults.Clear();
                 isLoadingTables = false;
                 StateHasChanged();
                 return;
@@ -60,10 +129,17 @@ namespace CandyDataEditor.Components.Layout
             StateHasChanged();
         }
 
-        protected void ToggleCollapse()
+        protected void ToggleTablesSection()
         {
-            isCollapsed = !isCollapsed;
+            isTablesSectionExpanded = !isTablesSectionExpanded;
         }
+
+        protected void ToggleSearchResultsSection()
+        {
+            isSearchResultsExpanded = !isSearchResultsExpanded;
+        }
+
+        protected void ToggleCollapse() => isCollapsed = !isCollapsed;
 
         protected async Task ToggleTableAccordionAsync(string tableName)
         {
@@ -104,20 +180,17 @@ namespace CandyDataEditor.Components.Layout
         protected void NavigateToRecord(string tableName, Dictionary<string, string> keyMap)
         {
             selectedTable = tableName;
-
             string keyParams = string.Join("&", keyMap.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
             NavManager.NavigateTo($"/editor/{Uri.EscapeDataString(tableName)}?{keyParams}");
         }
 
-        protected async Task CloseCurrentDatabaseAsync()
-        {
-            await DbService.CloseDatabaseAsync();
-        }
+        protected async Task CloseCurrentDatabaseAsync() => await DbService.CloseDatabaseAsync();
 
         private async Task HandleDatabaseChanged(string newPath)
         {
             expandedTable = null;
             selectedTable = null;
+            searchResults.Clear();
 
             if (string.IsNullOrEmpty(newPath))
             {
@@ -136,7 +209,6 @@ namespace CandyDataEditor.Components.Layout
 
         private async Task HandleDataChangedAsync()
         {
-            /* Preserve current expanded table state while refreshing keys */
             string? currentExpanded = expandedTable;
 
             dbObjects = await DbService.GetTablesAndViewsAsync();
@@ -160,6 +232,11 @@ namespace CandyDataEditor.Components.Layout
         {
             DbService.OnDatabasePathChanged -= HandleDatabaseChanged;
             DbService.OnDataChanged -= HandleDataChangedAsync;
+            if (_debounceTimer != null)
+            {
+                _debounceTimer.Elapsed -= OnDebounceTimerElapsedAsync;
+                _debounceTimer.Dispose();
+            }
         }
     }
 }

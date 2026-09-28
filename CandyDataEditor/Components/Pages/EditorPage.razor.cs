@@ -46,6 +46,9 @@ namespace CandyDataEditor.Pages
         protected string? saveErrorMessage = null;
         protected Dictionary<string, string> fieldErrorMessages = new(StringComparer.OrdinalIgnoreCase);
 
+        // Search Results
+        protected int DOMDelayInMilliseconds = 500;
+
         protected IEnumerable<DbObjectInfo> FilteredObjects => dbObjects
             .Where(o => typeFilter == "all" || o.Type == typeFilter)
             .Where(o => string.IsNullOrWhiteSpace(searchFilter) || o.Name.Contains(searchFilter, StringComparison.OrdinalIgnoreCase));
@@ -77,18 +80,36 @@ namespace CandyDataEditor.Pages
             if (queryParams.Count > 0)
             {
                 var targetKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                string? focusColumn = null;
+                string searchTerm = string.Empty;
 
                 foreach (string? key in queryParams.AllKeys)
                 {
                     if (!string.IsNullOrEmpty(key) && queryParams[key] != null)
                     {
-                        targetKeys[key] = queryParams[key]!;
+                        if (key.Equals("FocusColumn", StringComparison.OrdinalIgnoreCase))
+                        {
+                            focusColumn = queryParams[key];
+                        }
+                        else if (key.Equals("SearchTerm", StringComparison.OrdinalIgnoreCase))
+                        {
+                            searchTerm = queryParams["SearchTerm"] ?? string.Empty;
+                        }
+                        else
+                        {
+                            targetKeys[key] = queryParams[key]!;
+                        }
                     }
                 }
 
                 if (targetKeys.Any())
                 {
                     await ExecuteNavigationForTable(TableName, targetKeys);
+
+                    if (!string.IsNullOrEmpty(focusColumn))
+                    {
+                        await HighlightAndScrollToColumnAsync(focusColumn, searchTerm);
+                    }
                 }
             }
             else
@@ -117,6 +138,30 @@ namespace CandyDataEditor.Pages
             tableRecordKeys[tableName] = await DbService.GetRecordColumnsAsync(tableName, pkCols);
 
             isLoadingData = false;
+        }
+
+        private async Task HighlightAndScrollToColumnAsync(string columnName, string searchTerm)
+        {
+            try
+            {
+                // Wait for Blazor to complete component rendering and DOM creation
+                await Task.Delay(DOMDelayInMilliseconds);
+
+                string containerId = $"field_container_{columnName}";
+
+                // 1. Scroll & pulse the field container
+                await JSRuntime.InvokeVoidAsync("scrollToAndHighlightField", columnName);
+
+                // 2. Focus and select text in TipTap editor
+                if (!string.IsNullOrEmpty(searchTerm))
+                {
+                    await JSRuntime.InvokeVoidAsync("selectTipTapTextByContainerId", containerId, searchTerm);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error focusing TipTap editor text: {ex.Message}");
+            }
         }
 
         protected string GetFieldValue(string columnName)

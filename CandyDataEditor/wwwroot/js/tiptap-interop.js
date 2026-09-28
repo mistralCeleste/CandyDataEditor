@@ -318,6 +318,113 @@ window.setTipTapContentFromHtml = function (elementId, htmlText) {
     editor.commands.setContent(htmlText || '', false);
 };
 
+window.scrollToAndHighlightField = function (columnName) {
+    if (!columnName) return;
+    const elem = document.getElementById('field_container_' + columnName);
+    if (elem) {
+        elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        elem.classList.add('search-match-active');
+        setTimeout(() => {
+            elem.classList.remove('search-match-active');
+        }, 2200);
+    }
+};
+
+window.selectTipTapTextByContainerId = function (containerId, searchTerm) {
+    if (!containerId) return;
+
+    // Find the editor container element inside the field wrapper
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const editorDiv = container.querySelector('.tiptap-container');
+    if (!editorDiv) return;
+
+    // Retrieve TipTap instance registered under editorDiv.id
+    const editorId = editorDiv.id;
+    if (!window.tiptapInstances || !window.tiptapInstances[editorId]) return;
+
+    const editor = window.tiptapInstances[editorId];
+    if (!editor || !editor.view) return;
+
+    // Focus editor canvas
+    editor.commands.focus();
+
+    if (!searchTerm) {
+        editor.commands.selectAll();
+        return;
+    }
+
+    // Scan ProseMirror document tree for character position of matching term
+    const doc = editor.state.doc;
+    let foundPos = -1;
+
+    doc.descendants((node, pos) => {
+        if (node.isText && foundPos === -1) {
+            const idx = node.text.toLowerCase().indexOf(searchTerm.toLowerCase());
+            if (idx !== -1) {
+                foundPos = pos + idx;
+            }
+        }
+    });
+
+    if (foundPos !== -1) {
+        const from = foundPos;
+        const to = foundPos + searchTerm.length;
+
+        // Set cursor selection and scroll into view
+        editor.commands.setTextSelection({ from: from, to: to });
+    }
+};
+
+// Focuses the TipTap editor and selects a specific text range or search term
+window.selectTipTapText = function (editorId, searchTerm) {
+    if (!window.tiptapInstances || !window.tiptapInstances[editorId]) return;
+
+    const editor = window.tiptapInstances[editorId];
+    if (!editor || !editor.view) return;
+
+    const doc = editor.state.doc;
+    if (!searchTerm) {
+        // Select all text as fallback
+        editor.commands.selectAll();
+        editor.commands.focus();
+        return;
+    }
+
+    // Find position of the term inside doc text
+    let foundPos = -1;
+    doc.descendants((node, pos) => {
+        if (node.isText && foundPos === -1) {
+            const index = node.text.toLowerCase().indexOf(searchTerm.toLowerCase());
+            if (index !== -1) {
+                foundPos = pos + index;
+            }
+        }
+    });
+
+    if (foundPos !== -1) {
+        const from = foundPos;
+        const to = foundPos + searchTerm.length;
+
+        // Set cursor selection and focus canvas
+        editor.commands.setTextSelection({ from: from, to: to });
+        editor.commands.focus();
+    } else {
+        editor.commands.focus();
+    }
+};
+
+// Simple command to select all content in an editor
+window.selectAllTipTapText = function (editorId) {
+    if (!window.tiptapInstances || !window.tiptapInstances[editorId]) return;
+    const editor = window.tiptapInstances[editorId];
+    if (editor) {
+        editor.commands.selectAll();
+        editor.commands.focus();
+    }
+};
+
 window.destroyTipTap = function (elementId) {
     if (window.tiptapInstances && window.tiptapInstances[elementId]) {
         try {

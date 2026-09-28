@@ -232,6 +232,28 @@ namespace CandyDataEditor.Components.Fields
             : (Config?.DetectedLigatures?.Count > 0 ? Config.DetectedLigatures : DefaultIcons)
                 .Where(i => i.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
 
+        /// <summary>
+        /// Selects a specific search term within the TipTap editor canvas and focuses it.
+        /// </summary>
+        public async Task SelectTextTermAsync(string term)
+        {
+            if (_isInitialized)
+            {
+                await JSRuntime.InvokeVoidAsync("selectTipTapText", EditorId, term);
+            }
+        }
+
+        /// <summary>
+        /// Selects all text inside the TipTap editor canvas.
+        /// </summary>
+        public async Task SelectAllTextAsync()
+        {
+            if (_isInitialized)
+            {
+                await JSRuntime.InvokeVoidAsync("selectAllTipTapText", EditorId);
+            }
+        }
+
         public async ValueTask DisposeAsync()
         {
             try
