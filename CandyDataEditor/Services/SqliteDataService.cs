@@ -458,9 +458,9 @@ public class SqliteDataService
                 var data = await GetTableDataAsync(table);
                 string filePath = Path.Combine(outputDirectory, $"{table}.{format.ToLower()}");
 
-                if (format.Equals("tsv", StringComparison.OrdinalIgnoreCase) || format.Equals("csv", StringComparison.OrdinalIgnoreCase))
+                if (format.Equals("txt", StringComparison.OrdinalIgnoreCase) || format.Equals("csv", StringComparison.OrdinalIgnoreCase))
                 {
-                    bool isTsv = format.Equals("tsv", StringComparison.OrdinalIgnoreCase);
+                    bool isTsv = format.Equals("txt", StringComparison.OrdinalIgnoreCase);
                     char sep = isTsv ? '\t' : ',';
                     var sb = new StringBuilder();
 
