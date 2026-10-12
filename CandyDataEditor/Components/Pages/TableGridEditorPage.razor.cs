@@ -1,11 +1,13 @@
 ﻿using CandyDataEditor.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 
 namespace CandyDataEditor.Pages
 {
     public partial class TableGridEditorPage : ComponentBase
     {
         [Inject] protected SqliteDataService DbService { get; set; } = default!;
+        [Inject] protected NavigationManager NavManager { get; set; } = default!;
 
         [Parameter] public string TableName { get; set; } = string.Empty;
 
@@ -22,6 +24,10 @@ namespace CandyDataEditor.Pages
         protected string messageBoxTitle = "Error";
         protected string messageBoxMessage = string.Empty;
 
+        protected bool showUnsavedModal = false;
+        private string? pendingTableName = null;
+        private string? pendingTargetUri = null;
+
         public class GridRowModel
         {
             public Guid RowId { get; } = Guid.NewGuid(); // Unique key for Blazor DOM diffing
@@ -35,10 +41,72 @@ namespace CandyDataEditor.Pages
         }
 
         protected bool HasValidationErrors => gridRows.Any(r => r.FieldErrors.Any());
+        protected bool HasUnsavedChanges => gridRows.Any(r => r.IsDirty);
 
         protected override async Task OnParametersSetAsync()
         {
+            if (!string.IsNullOrEmpty(TableName) && gridRows.Any() && pendingTableName != TableName && HasUnsavedChanges)
+            {
+                pendingTableName = TableName;
+                showUnsavedModal = true;
+                StateHasChanged();
+                return;
+            }
+
             await ReloadDataAsync();
+        }
+
+        /// <summary>
+        /// Intercepts Blazor router navigation before leaving the Table Grid Editor.
+        /// </summary>
+        private async Task OnBeforeInternalNavigationAsync(LocationChangingContext context)
+        {
+            if (HasUnsavedChanges)
+            {
+                context.PreventNavigation();
+                pendingTargetUri = context.TargetLocation;
+                showUnsavedModal = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        protected async Task SaveAndProceedAsync()
+        {
+            showUnsavedModal = false;
+            await SaveAllChangesAsync();
+
+            if (!HasValidationErrors && !HasUnsavedChanges && !string.IsNullOrEmpty(pendingTargetUri))
+            {
+                string target = pendingTargetUri;
+                pendingTargetUri = null;
+                TableName = string.Empty;
+                NavManager.NavigateTo(target);
+            }
+        }
+
+        protected async Task RevertAndProceedAsync()
+        {
+            showUnsavedModal = false;
+
+            if (!string.IsNullOrEmpty(pendingTargetUri))
+            {
+                string target = pendingTargetUri;
+                pendingTargetUri = null;
+
+                foreach (var row in gridRows)
+                {
+                    row.CurrentValues = new Dictionary<string, string>(row.OriginalValues, StringComparer.OrdinalIgnoreCase);
+                    row.IsNewRow = false;
+                    row.FieldErrors.Clear();
+                }
+
+                TableName = string.Empty;
+                NavManager.NavigateTo(target);
+            }
+            else
+            {
+                await ReloadDataAsync();
+            }
         }
 
         protected async Task ReloadDataAsync()
@@ -92,11 +160,11 @@ namespace CandyDataEditor.Pages
         {
             if (selectedRowIndex == index)
             {
-                selectedRowIndex = -1; // Unselect if clicked again
+                selectedRowIndex = -1;
             }
             else
             {
-                selectedRowIndex = index; // Select new row
+                selectedRowIndex = index;
             }
         }
 
@@ -106,7 +174,6 @@ namespace CandyDataEditor.Pages
             ValidateGrid();
         }
 
-        /* FIX 3: Creates a strictly EMPTY record */
         protected void AddNewRow()
         {
             var newRowValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

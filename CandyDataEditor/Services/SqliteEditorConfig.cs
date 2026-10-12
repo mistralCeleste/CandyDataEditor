@@ -5,6 +5,14 @@ using Microsoft.Maui.Storage;
 
 namespace CandyDataEditor;
 
+public enum ExternalFilePathMode
+{
+    Absolute = 0,
+    RelativeToRoot = 1,
+    RelativeToDatabase = 2
+}
+
+
 public class SqliteEditorConfig
 {
     // Default Fallbacks
@@ -14,6 +22,9 @@ public class SqliteEditorConfig
     private const int DefaultLargeCharThreshold = 300;
     private const bool DefaultIsDarkMode = false;
     private const int MaxRecentDatabases = 5;
+    private const int DefaultFilePathMode = (int)ExternalFilePathMode.RelativeToDatabase;
+    private const string DefaultFileRootPath = "";
+    private const bool DefaultUsePosixPathSeparators = false;
 
     // Font Defaults
     private const string DefaultFontFilePath = "";
@@ -62,8 +73,6 @@ public class SqliteEditorConfig
         set => SetStoredValue(nameof(IsDarkMode), value);
     }
 
-    // --- FONT & LIGATURE SETTINGS ---
-
     public string FontFilePath
     {
         get => GetStoredValue(nameof(FontFilePath), DefaultFontFilePath);
@@ -86,6 +95,24 @@ public class SqliteEditorConfig
     {
         get => GetStoredList(nameof(RecentDatabases));
         private set => SetStoredList(nameof(RecentDatabases), value);
+    }
+
+    public ExternalFilePathMode FilePathMode
+    {
+        get => (ExternalFilePathMode)GetStoredValue(nameof(FilePathMode), DefaultFilePathMode);
+        set => SetStoredValue(nameof(FilePathMode), (int)value);
+    }
+
+    public string FileRootPath
+    {
+        get => GetStoredValue(nameof(FileRootPath), DefaultFileRootPath);
+        set => SetStoredValue(nameof(FileRootPath), value);
+    }
+
+    public bool UsePosixPathSeparators
+    {
+        get => GetStoredValue(nameof(UsePosixPathSeparators), DefaultUsePosixPathSeparators);
+        set => SetStoredValue(nameof(UsePosixPathSeparators), value);
     }
 
     public void AddRecentDatabase(string path)

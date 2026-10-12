@@ -1,7 +1,42 @@
 ﻿@* Components/SqliteSettingsPane.razor *@
+@using CandyDataEditor.Services
+@inject FileDialogService FileDialog
+
 <div class="p-2">
-    <h6>🗄️ Database Query & Field Thresholds</h6>
-    <div class="row g-3 mt-1">
+    <h6 class="fw-bold text-primary mb-3">📁 External File & Image Path Settings</h6>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Path Resolution Mode</label>
+                <select class="form-select form-select-sm" @bind="DbService.Config.FilePathMode">
+                    <option value="@ExternalFilePathMode.Absolute">Absolute Paths (e.g. C:\Images\portrait.png)</option>
+                    <option value="@ExternalFilePathMode.RelativeToRoot">Relative to Configured Root Path</option>
+                    <option value="@ExternalFilePathMode.RelativeToDatabase">Relative to Database Directory</option>
+                </select>
+            </div>
+
+            @if (DbService.Config.FilePathMode == ExternalFilePathMode.RelativeToRoot)
+            {
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Configured Root Directory</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" placeholder="C:\GameData\Assets" @bind="DbService.Config.FileRootPath" />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="BrowseRootFolderAsync">📁 Browse</button>
+                    </div>
+                </div>
+            }
+
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="posixToggle" @bind="DbService.Config.UsePosixPathSeparators" />
+                <label class="form-check-label small fw-bold" for="posixToggle">
+                    Use POSIX Forward Slashes (<code>/</code>) instead of Windows Backslashes (<code>\</code>)
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <h6 class="fw-bold text-primary mb-3">🗄️ Database Query & Field Thresholds</h6>
+    <div class="row g-3">
         <div class="col-md-6">
             <label class="form-label small fw-bold">Query Row Limit</label>
             <input type="number" class="form-control form-control-sm" @bind="DbService.Config.QueryRowLimit" />

@@ -129,6 +129,7 @@
                                 {
                                     var meta = columnMetadata.TryGetValue(col, out var m) ? m : new ColumnMetadata();
                                     bool isReadOnlyField = meta.IsGenerated || meta.IsReadOnly;
+                                    bool isImageField = col.StartsWith("@"); // Indicator for image/file path
 
                                     string fieldValue = GetFieldValue(col);
                                     int lineCount = DbService.Config.GetLineCountForText(fieldValue);
@@ -141,6 +142,10 @@
                                         <label class="form-label fw-bold d-flex justify-content-between align-items-center mb-2">
                                             <span>@col</span>
                                             <div>
+                                                @if (isImageField)
+                                                {
+                                                    <span class="badge bg-info text-dark me-1">Image/File Path</span>
+                                                }
                                                 @if (meta.IsPrimaryKey)
                                                 {
                                                     <span class="badge bg-primary me-1">Primary Key</span>
@@ -156,12 +161,23 @@
                                             </div>
                                         </label>
 
-                                        <div style="@fieldHeightStyle">
-                                            <TipTapEditor MarkdownValue="@fieldValue"
-                                                          MarkdownValueChanged="(val) => OnCellValueChanged(col, val)"
-                                                          IsReadOnly="isReadOnlyField"
-                                                          OnBlur="OnFieldFocusLost" />
-                                        </div>
+                                        @if (isImageField)
+                                        {
+                                            <!-- External File / Image Field Editor -->
+                                            <ImageFileFieldEditor Value="@fieldValue"
+                                                                  ValueChanged="(val) => OnImageValueChanged(col, val)"
+                                                                  IsReadOnly="isReadOnlyField" />
+                                        }
+                                        else
+                                        {
+                                            <!-- Standard TipTap Editor -->
+                                            <div style="@fieldHeightStyle">
+                                                <TipTapEditor MarkdownValue="@fieldValue"
+                                                              MarkdownValueChanged="(val) => OnCellValueChanged(col, val)"
+                                                              IsReadOnly="isReadOnlyField"
+                                                              OnBlur="OnFieldFocusLost" />
+                                            </div>
+                                        }
 
                                         @if (hasFieldError)
                                         {
@@ -181,7 +197,7 @@
     </div>
 </div>
 
-<!-- UNSAVED CHANGES WARNING MODAL -->
+<!-- Dialogues -->
 <UnsavedChangesModal @bind-IsOpen="showUnsavedModal"
                      OnDiscard="RevertAndProceed"
                      OnSave="SaveAndProceed" />

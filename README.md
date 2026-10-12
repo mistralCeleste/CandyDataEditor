@@ -12,7 +12,8 @@ Designed specifically for game development workflows, it pairs relational data n
 * **Rich Text & Spellcheck Editor**: Custom TipTap JS integration providing inline game-icon font ligatures (e.g., `[place]`, `[defense]`) and spellcheck validation.
 * **Multi-Format Export Engine**: Multi-table data export support for TSV, CSV, XML, JSON, and standalone Interactive HTML Cards.
 * **UI Light/Dark Mode Support**: Seamless switching between light and dark themes for improved usability in different lighting conditions.
-
+* **Custom Dictionary Management**: Add, remove, and manage custom wordlists for spellcheck directly within the application.
+* **Custom File Reference Saving**: Configure your file reference saving behavior to either store absolute paths or relative paths based on your project needs.
 ---
 
 ## 🛠️ Project Structure
@@ -22,18 +23,21 @@ CandyDataEditor.sln
 │
 ├── CandyDataEditor/               # Main C# Blazor Project
 │   ├── Components/
-│   │   ├── RibbonMenuBar.razor    # Top navigation, file picker & app settings
-│   │   └── SpellcheckInitializer.razor
-│   ├── Pages/
-│   │   └── Home.razor             # Primary workspace dashboard & recent DBs
-│   ├── Services/
-│   │   ├── SqliteDataService.cs   # SQLite engine & database state manager
-│   │   └── GameDictionaryService.cs # Custom wordlists & dictionary loader
-│   ├── Shared/
-│   │   └── MainLayout.razor       # App shell, sidebar accordions & routing
+│   │   ├── Fields/                # Custom Blazor form fields (e.g., TipTapEditor, ImageFileFieldEditor)
+│   │   ├── Fonts/                 # Ligature, Game Icon, and Font Preview and Picker components
+│   │   ├── Layout/                # Layout components (e.g., MainLayout, Sidebar)
+│   │   ├── Menus/                 # Menu components (e.g., RibbonMenu, ContextMenu)
+│   │   ├── MessageBoxes/          # Message box components (e.g., MessageBoxes, Alerts, Notifications )
+│   │   ├── Pages/                 # Page components (e.g., TableGridEditorPage, EditorPage, WelcomePage)
+│   │   ├── Settings/              # Settings page components (e.g., DictionarySettingsPage, LigatureSettings, AppearanceSettings)
+│   │   ├── Spellcheck/            # Spellcheck components (e.g., SpellcheckEditor, SpellcheckDictionaryManager)
+│   │   ├── _imports.razor         # global component imports
+│   │   ├── Routes.razor           # routing definitions
+│   ├── Services/                  # Application services (e.g., SqliteData, GameDictionary, Search, Font, FileDialogs)
 │   └── wwwroot/
-│       └── js/
-│           └── tiptap.bundle.js   # Compiled esbuild output
+│       └── css/                   # CSS files (e.g., bootstrap.min, site, light/dark mode styles)
+│       └── dictionaries/          # Spellcheck dictionary files (e.g., custom_user_words.txt, default_game_words.txt)
+│       └── js/                    # TipTap JS bundle output directory (e.g., tiptap-interop, bundle, spellcheck)
 │
 └── TipTap/                        # Standalone JS Bundle Project
     ├── package.json               # TipTap & esbuild dependency manifest
@@ -86,4 +90,11 @@ Spellcheck dictionaries reside in the application's bundled dictionaries directo
 
 ## 🔤 Game Icon Font Ligatures
 
-Supports custom ligatures from fonts, from my included font, I put my icons in the FeatureTable named 'icon', which is built using FontForge, SVGs, and an open-source serif font as a base.  The font can be loaded into the app, scanned, and either used by simply typing, or selecting the glyph from a menu.
+Supports custom ligatures from fonts where the font can be loaded into the app, scanned, and either used by simply typing, or selecting the glyph from a menu.
+I have a custom ligature tool at [https://github.com/mistralCeleste/LigatureIconGenerator](https://github.com/mistralCeleste/LigatureIconGenerator).
+
+
+
+## 🖼️ Images in the Database Editor
+
+To enable the image picker, preview, and file path formatting, ensure that the table contains a Text field that starts with `@`, like `@BackgroundImage`, for example. This will enable the browse button and image preview. Supported formats include PNG, JPEG, SVG. Other formats may not have a preview, like PSD, AI, and PDF.

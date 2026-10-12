@@ -35,6 +35,7 @@ namespace CandyDataEditor.Pages
         protected Dictionary<string, string>? editingRow = null;
         protected Dictionary<string, string> originalRowSnapshot = new(StringComparer.OrdinalIgnoreCase);
         protected Dictionary<string, string> originalKeys = new(StringComparer.OrdinalIgnoreCase);
+        protected Dictionary<string, string> navigationKeys = new(StringComparer.OrdinalIgnoreCase);
 
         // Auto-Save & Change Tracking
         protected bool autoSaveEnabled = false;
@@ -67,11 +68,9 @@ namespace CandyDataEditor.Pages
 
         protected override async Task OnParametersSetAsync()
         {
-            if (string.IsNullOrEmpty(TableName)) return;
-
-            if (selectedTable != TableName)
+            if (string.IsNullOrEmpty(TableName))
             {
-                await SelectTable(TableName);
+                return;
             }
 
             var uri = NavManager.ToAbsoluteUri(NavManager.Uri);
@@ -80,8 +79,9 @@ namespace CandyDataEditor.Pages
             if (queryParams.Count > 0)
             {
                 var targetKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                string? focusColumn = null;
+                string focusColumn = null;
                 string searchTerm = string.Empty;
+                string name = string.Empty;
 
                 foreach (string? key in queryParams.AllKeys)
                 {
@@ -89,11 +89,15 @@ namespace CandyDataEditor.Pages
                     {
                         if (key.Equals("FocusColumn", StringComparison.OrdinalIgnoreCase))
                         {
-                            focusColumn = queryParams[key];
+                            focusColumn = queryParams[key] ?? string.Empty;
                         }
                         else if (key.Equals("SearchTerm", StringComparison.OrdinalIgnoreCase))
                         {
                             searchTerm = queryParams["SearchTerm"] ?? string.Empty;
+                        }
+                        else if (key.Equals("Name", StringComparison.OrdinalIgnoreCase))
+                        {
+                            name = queryParams[key]! ?? string.Empty;
                         }
                         else
                         {
@@ -104,7 +108,31 @@ namespace CandyDataEditor.Pages
 
                 if (targetKeys.Any())
                 {
+                    bool isSameRecord = originalKeys != null && IsMatchingKeys(originalKeys, targetKeys) && selectedTable == TableName;
+
+                    if (!isSameRecord && HasUnsavedChanges())
+                    {
+                        if (autoSaveEnabled)
+                        {
+                            await SaveCurrentRecord();
+                        }
+                        else
+                        {
+                            pendingNavigationTable = TableName;
+                            pendingNavigationTargetKey = targetKeys;
+                            showUnsavedModal = true;
+                            StateHasChanged();
+                            return;
+                        }
+                    }
+
+                    // Execute navigation to new record
                     await ExecuteNavigationForTable(TableName, targetKeys);
+
+                    navigationKeys = new Dictionary<string, string>(targetKeys, StringComparer.OrdinalIgnoreCase)
+                    {
+                        { "Name", name }
+                    };
 
                     if (!string.IsNullOrEmpty(focusColumn))
                     {
@@ -114,6 +142,14 @@ namespace CandyDataEditor.Pages
             }
             else
             {
+                if (HasUnsavedChanges() && !autoSaveEnabled)
+                {
+                    pendingNavigationTable = null;
+                    pendingNavigationTargetKey = null;
+                    showUnsavedModal = true;
+                    return;
+                }
+
                 CloseRecordEditor();
             }
         }
@@ -133,7 +169,11 @@ namespace CandyDataEditor.Pages
             columnMetadata = await DbService.GetColumnMetadataAsync(tableName);
 
             var pkCols = columnMetadata.Where(c => c.Value.IsPrimaryKey).Select(c => c.Key).ToList();
-            if (!pkCols.Any() && tableData.Columns.Any()) pkCols.Add(tableData.Columns.First());
+
+            if (!pkCols.Any() && tableData.Columns.Any())
+            {
+                pkCols.Add(tableData.Columns.First());
+            }
 
             tableRecordKeys[tableName] = await DbService.GetRecordColumnsAsync(tableName, pkCols);
 
@@ -144,15 +184,11 @@ namespace CandyDataEditor.Pages
         {
             try
             {
-                // Wait for Blazor to complete component rendering and DOM creation
                 await Task.Delay(DOMDelayInMilliseconds);
 
                 string containerId = $"field_container_{columnName}";
-
-                // 1. Scroll & pulse the field container
                 await JSRuntime.InvokeVoidAsync("scrollToAndHighlightField", columnName);
 
-                // 2. Focus and select text in TipTap editor
                 if (!string.IsNullOrEmpty(searchTerm))
                 {
                     await JSRuntime.InvokeVoidAsync("selectTipTapTextByContainerId", containerId, searchTerm);
@@ -224,17 +260,20 @@ namespace CandyDataEditor.Pages
                 }
             }
         }
-        protected void OnCellValueChanged(string columnName, string value)
-        {
-            SetFieldValue(columnName, value);
-            ValidateCurrentRecord();
-        }
 
         protected string CleanTextValue(string? val)
         {
-            if (string.IsNullOrWhiteSpace(val)) return "";
+            if (string.IsNullOrWhiteSpace(val))
+            {
+                return "";
+            }
+
             string trimmed = val.Trim();
-            if (trimmed == "<p></p>" || trimmed == "<p><br></p>" || trimmed == "<br>" || trimmed == "\\n") return "";
+            if (trimmed == "<p></p>" || trimmed == "<p><br></p>" || trimmed == "<br>" || trimmed == "\\n")
+            {
+                return "";
+            }
+
             return trimmed;
         }
 
@@ -244,7 +283,10 @@ namespace CandyDataEditor.Pages
         protected bool ValidateCurrentRecord()
         {
             fieldErrorMessages.Clear();
-            if (editingRow == null) return true;
+            if (editingRow == null)
+            {
+                return true;
+            }
 
             var pkCols = columnMetadata
                 .Where(c => c.Value.IsPrimaryKey)
@@ -315,29 +357,64 @@ namespace CandyDataEditor.Pages
 
         protected bool HasUnsavedChanges()
         {
-            if (editingRow == null) return false;
+            if (editingRow == null)
+            {
+                return false;
+            }
+
             foreach (var kvp in editingRow)
             {
                 string orig = originalRowSnapshot.TryGetValue(kvp.Key, out var oVal) ? NormalizeValue(oVal) : "";
                 string curr = NormalizeValue(kvp.Value);
 
-                if (!string.Equals(curr, orig, StringComparison.Ordinal)) return true;
+                if (!string.Equals(curr, orig, StringComparison.Ordinal))
+                {
+                    return true;
+                }
             }
             return false;
         }
 
         protected string NormalizeValue(string? val)
         {
-            if (string.IsNullOrWhiteSpace(val)) return "";
+            if (string.IsNullOrWhiteSpace(val))
+            {
+                return "";
+            }
+
             string trimmed = val.Trim();
-            if (trimmed == "<p></p>" || trimmed == "<p><br></p>" || trimmed == "<br>") return "";
+            if (trimmed == "<p></p>" || trimmed == "<p><br></p>" || trimmed == "<br>")
+            {
+                return "";
+            }
+
             return trimmed;
+        }
+
+        protected void OnCellValueChanged(string columnName, string value)
+        {
+            SetFieldValue(columnName, value);
+            ValidateCurrentRecord();
+        }
+
+        protected async Task OnImageValueChanged(string columnName, string value)
+        {
+            SetFieldValue(columnName, value);
+            await SaveUnsavedChanges();
         }
 
         protected async Task OnFieldFocusLost()
         {
-            if (editingRow == null) return;
+            if (editingRow == null)
+            {
+                return;
+            }
 
+            await SaveUnsavedChanges();
+        }
+
+        protected async Task SaveUnsavedChanges()
+        {
             bool isValid = ValidateCurrentRecord();
 
             if (HasUnsavedChanges())
@@ -436,7 +513,10 @@ namespace CandyDataEditor.Pages
 
         protected async Task<bool> SaveCurrentRecord()
         {
-            if (editingRow == null) return false;
+            if (editingRow == null)
+            {
+                return false;
+            }
 
             saveErrorMessage = null;
 
@@ -517,7 +597,10 @@ namespace CandyDataEditor.Pages
 
         protected async Task CloneCurrentRecord()
         {
-            if (editingRow == null) return;
+            if (editingRow == null)
+            {
+                return;
+            }
 
             var clonedRow = new Dictionary<string, string>(editingRow, StringComparer.OrdinalIgnoreCase);
 
@@ -544,7 +627,10 @@ namespace CandyDataEditor.Pages
 
         protected async Task DeleteCurrentRecord()
         {
-            if (editingRow == null) return;
+            if (editingRow == null)
+            {
+                return;
+            }
 
             string? err = await DbService.DeleteRecordAsync(selectedTable, originalKeys);
             if (err != null)
@@ -562,11 +648,18 @@ namespace CandyDataEditor.Pages
 
         protected int GetCurrentRecordIndex()
         {
-            if (!tableRecordKeys.ContainsKey(selectedTable)) return -1;
+            if (!tableRecordKeys.ContainsKey(selectedTable))
+            {
+                return -1;
+            }
+
             var list = tableRecordKeys[selectedTable];
             for (int i = 0; i < list.Count; i++)
             {
-                if (IsMatchingKeys(list[i], originalKeys)) return i;
+                if (IsMatchingKeys(list[i], originalKeys))
+                {
+                    return i;
+                }
             }
             return -1;
         }
@@ -592,7 +685,10 @@ namespace CandyDataEditor.Pages
         protected async Task OnPkJumpSelected(ChangeEventArgs e)
         {
             string? val = e.Value?.ToString();
-            if (string.IsNullOrEmpty(val) || !tableRecordKeys.ContainsKey(selectedTable)) return;
+            if (string.IsNullOrEmpty(val) || !tableRecordKeys.ContainsKey(selectedTable))
+            {
+                return;
+            }
 
             var target = tableRecordKeys[selectedTable].FirstOrDefault(km => FormatKeyMapLabel(km) == val);
             if (target != null)
@@ -608,7 +704,10 @@ namespace CandyDataEditor.Pages
 
         protected string GetSelectedKeyMapLabel()
         {
-            if (originalKeys == null || !originalKeys.Any()) return string.Empty;
+            if (originalKeys == null || !originalKeys.Any())
+            {
+                return string.Empty;
+            }
 
             // Get the primary key column names for the current table
             var pkCols = columnMetadata
@@ -638,10 +737,17 @@ namespace CandyDataEditor.Pages
 
         protected bool IsMatchingKeys(Dictionary<string, string> a, Dictionary<string, string> b)
         {
-            if (a.Count != b.Count) return false;
+            if (a.Count != b.Count)
+            {
+                return false;
+            }
+
             foreach (var kvp in a)
             {
-                if (!b.TryGetValue(kvp.Key, out var val) || val != kvp.Value) return false;
+                if (!b.TryGetValue(kvp.Key, out var val) || val != kvp.Value)
+                {
+                    return false;
+                }
             }
             return true;
         }
@@ -650,6 +756,7 @@ namespace CandyDataEditor.Pages
         {
             editingRow = null;
             originalKeys = new Dictionary<string, string>();
+            navigationKeys = new Dictionary<string, string>();
             pendingNavigationTargetKey = null;
             pendingNavigationTable = null;
 

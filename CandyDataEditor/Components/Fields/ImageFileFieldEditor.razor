@@ -1,0 +1,70 @@
+﻿@namespace CandyDataEditor.Components.Fields
+@using CandyDataEditor.Services
+
+<div class="image-field-editor border rounded p-2 bg-body d-flex flex-column gap-2">
+    <div class="d-flex align-items-center gap-3">
+        <!-- Thumbnail Preview Container -->
+        <div class="thumbnail-preview-box border rounded bg-light d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0"
+             style="width: 72px; height: 72px; position: relative;">
+            @if (!string.IsNullOrWhiteSpace(resolvedAbsolutePath) && FileExists)
+            {
+                if (IsDirectRenderableImage)
+                {
+                    @if (!string.IsNullOrWhiteSpace(imageDataUri))
+                    {
+                        <img src="@imageDataUri" alt="Preview" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                    }
+                }
+                else
+                {
+                    <!-- Fallback for PSD/AI formats -->
+                    <div class="text-center p-1">
+                        <span class="fs-4 d-block">🎨</span>
+                        <small class="fw-bold text-uppercase fs-8 text-secondary">@FileExtension</small>
+                    </div>
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(Value))
+            {
+                <div class="text-center text-danger p-1">
+                    <span class="fs-5 d-block">⚠️</span>
+                    <small class="fs-8">Missing</small>
+                </div>
+            }
+            else
+            {
+                <span class="text-muted fs-4">🖼️</span>
+            }
+        </div>
+
+        <!-- Path & Actions Area -->
+        <div class="flex-grow-1 overflow-hidden d-flex flex-column gap-1">
+            <div class="d-flex align-items-center justify-content-between">
+                <span class="small text-muted fw-bold">Assigned File Path:</span>
+                @if (IsReadOnly)
+                {
+                    <span class="badge bg-secondary">Read-Only</span>
+                }
+            </div>
+
+            <div class="text-truncate font-monospace small bg-body-tertiary p-2 border rounded" title="@Value">
+                @(string.IsNullOrWhiteSpace(Value) ? "None selected" : ShortenPath(Value))
+            </div>
+
+            @if (!IsReadOnly)
+            {
+                <div class="d-flex gap-2 mt-1">
+                    <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" @onclick="BrowseFileAsync">
+                        📁 Browse...
+                    </button>
+                    @if (!string.IsNullOrWhiteSpace(Value))
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" @onclick="ClearFile">
+                            ❌ Clear
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

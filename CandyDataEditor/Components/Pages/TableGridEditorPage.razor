@@ -5,6 +5,9 @@
 
 <PageTitle>Table Grid View - @TableName</PageTitle>
 
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges"
+                OnBeforeInternalNavigation="OnBeforeInternalNavigationAsync" />
+
 <div class="container-fluid my-3">
     <!-- Header Controls Bar -->
     <div class="d-flex align-items-center justify-content-between mb-3 bg-light p-3 rounded border shadow-sm flex-wrap gap-2 sticky-top">
@@ -149,7 +152,11 @@
     }
 </div>
 
-<!-- ERROR DIALOG -->
+<!-- Dialogues -->
 <MessageBox @bind-IsOpen="showMessageBox"
             Title="@messageBoxTitle"
             Message="@messageBoxMessage" />
+
+<UnsavedChangesModal @bind-IsOpen="showUnsavedModal"
+                     OnDiscard="RevertAndProceedAsync"
+                     OnSave="SaveAndProceedAsync" />

@@ -164,6 +164,11 @@
       </None>
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Resources\Fonts\" />
+      <Folder Include="wwwroot\fonts\" />
+    </ItemGroup>
+
 	<!-- Custom Build Step for TipTap JS Bundle -->
 	<Target Name="BuildTipTapBundle" BeforeTargets="BeforeBuild" Inputs="../TipTap/tiptap-entry.js;../TipTap/package.json" Outputs="wwwroot/js/tiptap-bundle.js">
 
