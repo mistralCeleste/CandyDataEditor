@@ -3,6 +3,7 @@
 **CandyDataEditor** is a desktop-grade SQLite database management application built with **C# .NET Blazor** and **Bootstrap 5**.
 Designed specifically for game development workflows, it pairs relational data navigation with dynamic rich-text editing—featuring font icon previewing and spellcheck dictionaries.
 
+![Screenshot of the app](images/sample-editor.png)
 ---
 
 ## 🚀 Features
@@ -69,7 +70,7 @@ cd CandyDataEditor
 
 2. **Open in Visual Studio**
 * Open `CandyDataEditor.sln`.
-* Set **`CandyDataEditor`** as the Startup Project (*Right-click project $\rightarrow$ Set as Startup Project*).
+* Set **`CandyDataEditor`** as the Startup Project (*Right-click project -> Set as Startup Project*).
 
 
 3. **Build & Launch**
@@ -82,10 +83,15 @@ cd CandyDataEditor
 
 Spellcheck dictionaries reside in the application's bundled dictionaries directory. You can manage wordlists directly within the app:
 
-1. Open **File** $\rightarrow$ **Settings** $\rightarrow$ **Dictionaries**.
+1. Open **File** -> **Settings** -> **Dictionaries**.
 2. Add or remove custom terms (saved to `custom_user_words.txt`).
 3. Click **Open Folder in Explorer** to add external `.txt` vocabulary files directly.
 
+### Dictionary Context Menu
+<img src="images/sample-spellcheck.png" alt="App Screenshot" height="200">
+
+### Dictionary Settings
+<img src="images/sample-dictionaries.png" alt="App Screenshot" height="400">
 
 
 ## 🔤 Game Icon Font Ligatures
@@ -93,8 +99,27 @@ Spellcheck dictionaries reside in the application's bundled dictionaries directo
 Supports custom ligatures from fonts where the font can be loaded into the app, scanned, and either used by simply typing, or selecting the glyph from a menu.
 I have a custom ligature tool at [https://github.com/mistralCeleste/LigatureIconGenerator](https://github.com/mistralCeleste/LigatureIconGenerator).
 
+### Ligature Settings
+<img src="images/sample-ligature.png" alt="App Screenshot" height="400">
 
 
 ## 🖼️ Images in the Database Editor
 
 To enable the image picker, preview, and file path formatting, ensure that the table contains a Text field that starts with `@`, like `@BackgroundImage`, for example. This will enable the browse button and image preview. Supported formats include PNG, JPEG, SVG. Other formats may not have a preview, like PSD, AI, and PDF.
+
+### Image File Field Editor
+<img src="images/sample-images.png" alt="App Screenshot" height="200">
+
+
+## Other Samples
+
+### Batch Editor
+Edit multiple records in a table at once with a batch editor. This allows you to clone and make changes to several rows and commit them in one operation.
+
+<img src="images/sample-batch-editor.png" alt="App Screenshot" width="600">
+
+### Data Export
+Export data from multiple tables to TSV, CSV, XML, JSON, or Interactive HTML Cards. The export engine supports multiple tables and can generate a single HTML file with embedded CSS and JS for interactive card viewing.
+
+<img src="images/sample-export.png" alt="App Screenshot" height="200">
+
